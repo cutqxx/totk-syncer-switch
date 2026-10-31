@@ -1,0 +1,25 @@
+# Real credentials never go to git
+config.json
+!switch/config.example.json
+webdav.json
+cacert.pem
+
+# Build output
+switch/build/
+switch/tests/build/
+*.nro
+*.nacp
+*.elf
+*.map
+*.nso
+*.pfs0
+
+# Save data / backups / test files
+*.sav
+*_before_pull.zip
+SW_*.zip
+PC_*.zip
+test.zip
+
+__pycache__/
+.DS_Store

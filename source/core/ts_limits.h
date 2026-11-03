@@ -1,0 +1,16 @@
+#ifndef TS_LIMITS_H
+#define TS_LIMITS_H
+
+#define TS_MAX_BODY_BYTES (64LL * 1024 * 1024)
+
+#define TS_MAX_ATTEMPTS 2
+#define TS_RETRY_DELAY_S 3
+
+#define TS_PATH_SIZE 256
+#define TS_URL_SIZE 1024
+#define TS_LINE_SIZE 512
+#define TS_TAG_SIZE 48
+#define TS_HEADERS_SIZE 8192
+#define TS_LOG_ENTRY_SIZE (TS_HEADERS_SIZE + 2 * TS_URL_SIZE + TS_LINE_SIZE)
+
+#endif

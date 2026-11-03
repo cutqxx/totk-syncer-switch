@@ -98,31 +98,31 @@ static void curl_error_beats_401_http_code(void)
 
 static void message_for_success_includes_http_code(void)
 {
-    expect_message_for_http(201, "Файл загружен (HTTP 201)");
+    expect_message_for_http(201, "File uploaded (HTTP 201)");
 }
 
-static void message_for_http_errors_is_russian_and_specific(void)
+static void message_for_http_errors_is_specific_per_status_code(void)
 {
-    expect_message_for_http(401, "Неверный логин/пароль (401)");
-    expect_message_for_http(409, "Папка на Диске не найдена (409)");
-    expect_message_for_http(507, "Недостаточно места на Диске (507)");
-    expect_message_for_http(500, "Ошибка сервера: HTTP 500");
-    expect_message_for_http(418, "Ошибка сервера: HTTP 418");
+    expect_message_for_http(401, "Wrong login/password (401)");
+    expect_message_for_http(409, "Folder not found on Disk (409)");
+    expect_message_for_http(507, "Not enough space on Disk (507)");
+    expect_message_for_http(500, "Server error: HTTP 500");
+    expect_message_for_http(418, "Server error: HTTP 418");
 }
 
-static void message_for_network_curl_codes_is_russian(void)
+static void message_for_network_and_tls_curl_codes_is_specific_and_includes_code(void)
 {
-    expect_message_for_curl(6, "Нет сети / не удалось найти сервер");
-    expect_message_for_curl(7, "Не удалось подключиться");
-    expect_message_for_curl(28, "Таймаут");
-    expect_message_for_curl(56, "Обрыв соединения при обмене данными (56)");
-    expect_message_for_curl(35, "Ошибка TLS / проверки сертификата");
-    expect_message_for_curl(60, "Ошибка TLS / проверки сертификата");
+    expect_message_for_curl(6, "No network / cannot resolve server (6)");
+    expect_message_for_curl(7, "Cannot connect (7)");
+    expect_message_for_curl(28, "Timeout (28)");
+    expect_message_for_curl(56, "Connection dropped during transfer (56)");
+    expect_message_for_curl(35, "TLS / certificate verification error (35)");
+    expect_message_for_curl(60, "TLS / certificate verification error (60)");
 }
 
 static void message_for_unknown_curl_code_includes_code_and_curl_text(void)
 {
-    expect_message_for_curl(23, "Ошибка curl 23: curl text");
+    expect_message_for_curl(23, "curl error 23: curl text");
 }
 
 static void message_is_truncated_and_terminated_in_small_buffer(void)
@@ -190,8 +190,8 @@ void run_outcome_tests(void)
     RUN_TEST(curl_error_beats_2xx_http_code);
     RUN_TEST(curl_error_beats_401_http_code);
     RUN_TEST(message_for_success_includes_http_code);
-    RUN_TEST(message_for_http_errors_is_russian_and_specific);
-    RUN_TEST(message_for_network_curl_codes_is_russian);
+    RUN_TEST(message_for_http_errors_is_specific_per_status_code);
+    RUN_TEST(message_for_network_and_tls_curl_codes_is_specific_and_includes_code);
     RUN_TEST(message_for_unknown_curl_code_includes_code_and_curl_text);
     RUN_TEST(message_is_truncated_and_terminated_in_small_buffer);
     RUN_TEST(retries_transient_network_kinds_while_attempts_remain);

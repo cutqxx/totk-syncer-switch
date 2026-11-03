@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "text_ru.h"
+#include "text.h"
 
 static int64_t file_size(FILE *file)
 {

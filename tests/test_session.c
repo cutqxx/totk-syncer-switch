@@ -265,7 +265,7 @@ static void upload_result_line_shows_http_curl_time_bytes_and_verdict(void)
     CHECK(strstr(line, "curl 0 (No error)") != NULL);
     CHECK(strstr(line, "12.4 s") != NULL);
     CHECK(strstr(line, "5/5 B") != NULL);
-    CHECK(strstr(line, "\xD0\xA3\xD0\xA1\xD0\x9F\xD0\x95\xD0\xA5") != NULL); /* УСПЕХ */
+    CHECK(strstr(line, "SUCCESS") != NULL);
 }
 
 static void upload_failure_line_shows_error_verdict_not_success(void)
@@ -277,8 +277,8 @@ static void upload_failure_line_shows_error_verdict_not_success(void)
     make_sd_with_test_zip(root, sizeof root);
     upload_once(&fake, root, &cfg);
     const char *line = fake.lines[fake.line_count - 2];
-    CHECK(strstr(line, "\xD0\x9E\xD0\xA8\xD0\x98\xD0\x91\xD0\x9A\xD0\x90") != NULL); /* ОШИБКА */
-    CHECK_STR_NOT_CONTAINS(line, "\xD0\xA3\xD0\xA1\xD0\x9F\xD0\x95\xD0\xA5");
+    CHECK(strstr(line, "ERROR") != NULL);
+    CHECK_STR_NOT_CONTAINS(line, "SUCCESS");
 }
 
 static void missing_test_zip_fails_preflight_without_network_request(void)
@@ -366,7 +366,7 @@ static void upload_fails_after_two_connection_resets_with_clear_message(void)
     CHECK_INT_EQ(upload_once(&fake, root, &cfg), OUTCOME_NET_RECV);
     CHECK_INT_EQ(fake.perform_calls, 2);
     CHECK_INT_EQ(fake.sleep_calls, 1);
-    CHECK(any_line_contains(&fake, "Обрыв соединения при обмене данными (56)"));
+    CHECK(any_line_contains(&fake, "Connection dropped during transfer (56)"));
 }
 
 static void upload_retries_on_timeout_resolve_and_connect_errors(void)
@@ -424,7 +424,7 @@ static void upload_with_401_shows_wrong_credentials_message(void)
     init_fake(&fake, 401);
     make_sd_with_test_zip(root, sizeof root);
     CHECK_INT_EQ(upload_once(&fake, root, &cfg), OUTCOME_AUTH);
-    CHECK(any_line_contains(&fake, "Неверный логин/пароль (401)"));
+    CHECK(any_line_contains(&fake, "Wrong login/password (401)"));
 }
 
 static void tls_verification_stays_enabled_on_every_attempt(void)
@@ -452,11 +452,11 @@ static void each_attempt_shows_uploading_line_before_perform_and_its_own_result_
     script_reset_then_success(&fake);
     make_sd_with_test_zip(root, sizeof root);
     upload_once(&fake, root, &cfg);
-    CHECK_STR_EQ(fake.line_before_perform[0], "Загрузка... (попытка 1/2)");
-    CHECK_STR_EQ(fake.line_before_perform[1], "Загрузка... (попытка 2/2)");
+    CHECK_STR_EQ(fake.line_before_perform[0], "Uploading... (attempt 1/2)");
+    CHECK_STR_EQ(fake.line_before_perform[1], "Uploading... (attempt 2/2)");
     CHECK(any_line_contains(&fake, "attempt 1/2"));
     CHECK(any_line_contains(&fake, "attempt 2/2"));
-    CHECK(any_line_contains(&fake, "Повтор через 3 с..."));
+    CHECK(any_line_contains(&fake, "Retrying in 3 s..."));
 }
 
 static void upload_with_empty_test_zip_fails_preflight_with_message(void)
@@ -469,7 +469,7 @@ static void upload_with_empty_test_zip_fails_preflight_with_message(void)
     CHECK(test_fs_write_file(root, TS_REL_TEST_ZIP, "", 0));
     CHECK_INT_EQ(upload_once(&fake, root, &cfg), OUTCOME_PREFLIGHT_FAILED);
     CHECK_INT_EQ(fake.perform_calls, 0);
-    CHECK_STR_EQ(fake.lines[0], "Файл пустой (0 байт): sd:/switch/totk-sync/test.zip");
+    CHECK_STR_EQ(fake.lines[0], "File is empty (0 bytes): sd:/switch/totk-sync/test.zip");
 }
 
 static void upload_with_missing_test_zip_shows_not_found_message(void)
@@ -480,7 +480,7 @@ static void upload_with_missing_test_zip_shows_not_found_message(void)
     init_fake(&fake, 201);
     CHECK(test_fs_make_root(root, sizeof root));
     upload_once(&fake, root, &cfg);
-    CHECK_STR_EQ(fake.lines[0], "Файл не найден: sd:/switch/totk-sync/test.zip");
+    CHECK_STR_EQ(fake.lines[0], "File not found: sd:/switch/totk-sync/test.zip");
 }
 
 static void upload_with_oversized_test_zip_fails_preflight_showing_size(void)
@@ -503,7 +503,7 @@ static void upload_with_oversized_test_zip_fails_preflight_showing_size(void)
     fclose(file);
     CHECK_INT_EQ(upload_once(&fake, root, &cfg), OUTCOME_PREFLIGHT_FAILED);
     CHECK_INT_EQ(fake.perform_calls, 0);
-    CHECK_STR_EQ(fake.lines[0], "Файл слишком большой (67108865 байт, максимум 67108864 байт): sd:/switch/totk-sync/test.zip");
+    CHECK_STR_EQ(fake.lines[0], "File too large (67108865 bytes, maximum 67108864 bytes): sd:/switch/totk-sync/test.zip");
 }
 
 static void upload_with_unbuildable_request_shows_error_and_performs_nothing(void)
@@ -517,7 +517,7 @@ static void upload_with_unbuildable_request_shows_error_and_performs_nothing(voi
     make_sd_with_test_zip(root, sizeof root);
     CHECK_INT_EQ(upload_once(&fake, root, &cfg), OUTCOME_PREFLIGHT_FAILED);
     CHECK_INT_EQ(fake.perform_calls, 0);
-    CHECK(any_line_contains(&fake, "Не удалось собрать запрос"));
+    CHECK(any_line_contains(&fake, "Cannot build request"));
 }
 
 static void upload_announces_ca_pem_when_present(void)
@@ -529,7 +529,7 @@ static void upload_announces_ca_pem_when_present(void)
     make_sd_with_test_zip(root, sizeof root);
     CHECK(test_fs_write_file(root, TS_REL_CA_PEM, "x", 1));
     upload_once(&fake, root, &cfg);
-    CHECK_STR_EQ(fake.lines[0], "CA: используется sd:/switch/totk-sync/ca.pem");
+    CHECK_STR_EQ(fake.lines[0], "CA: using sd:/switch/totk-sync/ca.pem");
 }
 
 static void upload_announces_system_certificates_when_ca_pem_absent(void)
@@ -540,7 +540,7 @@ static void upload_announces_system_certificates_when_ca_pem_absent(void)
     init_fake(&fake, 201);
     make_sd_with_test_zip(root, sizeof root);
     upload_once(&fake, root, &cfg);
-    CHECK_STR_EQ(fake.lines[0], "CA: системные сертификаты (ca.pem не найден)");
+    CHECK_STR_EQ(fake.lines[0], "CA: system certificates (ca.pem not found)");
 }
 
 static outcome_kind_t upload_logged(fake_t *fake, const char *root, const config_t *cfg, log_sink_t *log)
@@ -636,7 +636,7 @@ static void session_without_log_sink_still_uploads_and_shows_no_log_warning(void
     init_fake(&fake, 201);
     make_sd_with_test_zip(root, sizeof root);
     CHECK_INT_EQ(upload_once(&fake, root, &cfg), OUTCOME_SUCCESS);
-    CHECK(!any_line_contains(&fake, "Лог недоступен"));
+    CHECK(!any_line_contains(&fake, "Log unavailable"));
 }
 
 static void result_line_contains_variant_tag(void)
@@ -685,7 +685,7 @@ static void unwritable_log_does_not_stop_upload_and_is_reported_once_per_session
     log_sink_init(&log, log_root);
     CHECK_INT_EQ(upload_logged(&fake, root, &cfg, &log), OUTCOME_SUCCESS);
     CHECK_INT_EQ(fake.perform_calls, 1);
-    CHECK_INT_EQ(count_lines_containing(&fake, "Лог недоступен"), 1);
+    CHECK_INT_EQ(count_lines_containing(&fake, "Log unavailable"), 1);
 }
 
 static void log_warning_is_shown_only_once_across_two_uploads(void)
@@ -702,7 +702,7 @@ static void log_warning_is_shown_only_once_across_two_uploads(void)
     upload_logged(&fake, root, &cfg, &log);
     upload_logged(&fake, root, &cfg, &log);
     CHECK_INT_EQ(fake.perform_calls, 2);
-    CHECK_INT_EQ(count_lines_containing(&fake, "Лог недоступен"), 1);
+    CHECK_INT_EQ(count_lines_containing(&fake, "Log unavailable"), 1);
 }
 
 static void log_warning_appears_once_even_when_retry_attempts_fail_to_log(void)
@@ -719,7 +719,7 @@ static void log_warning_appears_once_even_when_retry_attempts_fail_to_log(void)
     log_sink_init(&log, log_root);
     CHECK_INT_EQ(upload_logged(&fake, root, &cfg, &log), OUTCOME_SUCCESS);
     CHECK_INT_EQ(fake.perform_calls, 2);
-    CHECK_INT_EQ(count_lines_containing(&fake, "Лог недоступен"), 1);
+    CHECK_INT_EQ(count_lines_containing(&fake, "Log unavailable"), 1);
 }
 
 static outcome_kind_t upload_with_experiment(fake_t *fake, const char *root, const config_t *cfg,

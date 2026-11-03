@@ -66,35 +66,35 @@ static void message_for_missing_file_names_the_path(void)
 {
     char msg[256];
     body_status_message(BODY_ERR_NOT_FOUND, "sd:/a/test.zip", 0, 100, msg, sizeof msg);
-    CHECK_STR_EQ(msg, "Файл не найден: sd:/a/test.zip");
+    CHECK_STR_EQ(msg, "File not found: sd:/a/test.zip");
 }
 
 static void message_for_empty_file_mentions_zero_bytes(void)
 {
     char msg[256];
     body_status_message(BODY_ERR_EMPTY, "sd:/a/test.zip", 0, 100, msg, sizeof msg);
-    CHECK_STR_EQ(msg, "Файл пустой (0 байт): sd:/a/test.zip");
+    CHECK_STR_EQ(msg, "File is empty (0 bytes): sd:/a/test.zip");
 }
 
 static void message_for_too_large_file_shows_actual_and_maximum_size(void)
 {
     char msg[256];
     body_status_message(BODY_ERR_TOO_LARGE, "sd:/a/test.zip", 70000000, 67108864, msg, sizeof msg);
-    CHECK_STR_EQ(msg, "Файл слишком большой (70000000 байт, максимум 67108864 байт): sd:/a/test.zip");
+    CHECK_STR_EQ(msg, "File too large (70000000 bytes, maximum 67108864 bytes): sd:/a/test.zip");
 }
 
 static void message_for_no_memory_names_the_path(void)
 {
     char msg[256];
     body_status_message(BODY_ERR_NO_MEMORY, "sd:/a/test.zip", 0, 100, msg, sizeof msg);
-    CHECK_STR_EQ(msg, "Не хватает памяти для загрузки файла: sd:/a/test.zip");
+    CHECK_STR_EQ(msg, "Not enough memory to load file: sd:/a/test.zip");
 }
 
 static void message_for_read_error_says_unreadable(void)
 {
     char msg[256];
     body_status_message(BODY_ERR_READ, "sd:/a/test.zip", 0, 100, msg, sizeof msg);
-    CHECK_STR_EQ(msg, "Не удалось прочитать sd:/a/test.zip");
+    CHECK_STR_EQ(msg, "Cannot read sd:/a/test.zip");
 }
 
 void run_body_tests(void)

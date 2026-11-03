@@ -303,8 +303,8 @@ static void broken_json_reports_line_and_column(void)
     const char *json = "{\n  \"origin\": \"https://h\",\n  \"basepath\": ?\n}";
     CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_ERR_PARSE);
     CHECK_INT_EQ(err.status, CONFIG_ERR_PARSE);
-    CHECK(strncmp(err.message, "Ошибка разбора " TOTK_PATH, strlen("Ошибка разбора " TOTK_PATH)) == 0);
-    CHECK(strstr(err.message, "строка 3, столбец 15") != NULL);
+    CHECK(strncmp(err.message, "Parse error in " TOTK_PATH, strlen("Parse error in " TOTK_PATH)) == 0);
+    CHECK(strstr(err.message, "line 3, column 15") != NULL);
 }
 
 static void broken_json_on_first_line_reports_line_one(void)
@@ -312,8 +312,8 @@ static void broken_json_on_first_line_reports_line_one(void)
     config_t cfg;
     config_error_t err;
     CHECK_INT_EQ(parse_jksv("{\"a\" 1}", &cfg, &err), CONFIG_ERR_PARSE);
-    CHECK(strstr(err.message, "Ошибка разбора " JKSV_PATH) == err.message);
-    CHECK(strstr(err.message, "строка 1, столбец 6") != NULL);
+    CHECK(strstr(err.message, "Parse error in " JKSV_PATH) == err.message);
+    CHECK(strstr(err.message, "line 1, column 6") != NULL);
 }
 
 static void empty_input_is_a_parse_error_and_does_not_crash(void)
@@ -321,7 +321,7 @@ static void empty_input_is_a_parse_error_and_does_not_crash(void)
     config_t cfg;
     config_error_t err;
     CHECK_INT_EQ(parse_totk("", &cfg, &err), CONFIG_ERR_PARSE);
-    CHECK(strstr(err.message, "Ошибка разбора " TOTK_PATH) == err.message);
+    CHECK(strstr(err.message, "Parse error in " TOTK_PATH) == err.message);
 }
 
 static void trailing_comma_object_is_rejected_without_leaking_password(void)
@@ -391,7 +391,7 @@ static void parse_error_position_ignores_bom(void)
     config_t cfg;
     config_error_t err;
     CHECK_INT_EQ(parse_totk("\xEF\xBB\xBF{\"a\" 1}", &cfg, &err), CONFIG_ERR_PARSE);
-    CHECK(strstr(err.message, "строка 1, столбец 6") != NULL);
+    CHECK(strstr(err.message, "line 1, column 6") != NULL);
 }
 
 static void successful_parse_clears_previous_error(void)

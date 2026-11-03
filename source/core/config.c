@@ -9,7 +9,7 @@
 
 #include "cJSON.h"
 #include "paths.h"
-#include "text_ru.h"
+#include "text.h"
 
 #define UTF8_BOM "\xEF\xBB\xBF"
 

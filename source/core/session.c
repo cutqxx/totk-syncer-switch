@@ -5,7 +5,7 @@
 
 #include "ts_limits.h"
 #include "paths.h"
-#include "text_ru.h"
+#include "text.h"
 #include "url.h"
 
 static void show_formatted(const upload_port_t *port, const char *format, const char *argument)

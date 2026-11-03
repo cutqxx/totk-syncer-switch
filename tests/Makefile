@@ -4,7 +4,7 @@ CORE_DIR := ../source/core
 CJSON_DIR := ../third_party/cjson
 BUILD_DIR := build
 
-CFLAGS := -std=c11 -Wall -Wextra -Werror -g -MMD -MP -I$(CORE_DIR) -I$(CJSON_DIR) -I.
+CFLAGS := -std=c11 -Wall -Wextra -Werror -g -MMD -MP -I$(CORE_DIR) -I$(CJSON_DIR) -I. -DTS_CORE_DIR=\"$(CORE_DIR)\"
 
 CORE_SOURCES := $(wildcard $(CORE_DIR)/*.c)
 TEST_SOURCES := $(wildcard *.c)

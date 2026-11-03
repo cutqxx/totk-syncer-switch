@@ -8,7 +8,7 @@
 #include "log.h"
 #include "ts_limits.h"
 #include "session.h"
-#include "text_ru.h"
+#include "text.h"
 #include "ui_console.h"
 #include "url.h"
 

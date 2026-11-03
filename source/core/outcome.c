@@ -3,7 +3,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 
-#include "text_ru.h"
+#include "text.h"
 
 static outcome_kind_t classify_curl_code(int curl_code)
 {
@@ -54,7 +54,7 @@ void outcome_message(const upload_outcome_t *o, char *out, size_t out_size)
     case OUTCOME_NET_CONNECT: snprintf(out, out_size, "%s", TXT_MSG_NET_CONNECT); break;
     case OUTCOME_TIMEOUT: snprintf(out, out_size, "%s", TXT_MSG_TIMEOUT); break;
     case OUTCOME_NET_RECV: snprintf(out, out_size, "%s", TXT_MSG_NET_RECV); break;
-    case OUTCOME_TLS: snprintf(out, out_size, "%s", TXT_MSG_TLS); break;
+    case OUTCOME_TLS: snprintf(out, out_size, TXT_MSG_TLS, o->curl_code); break;
     default: snprintf(out, out_size, TXT_MSG_CURL_OTHER, o->curl_code, o->curl_error); break;
     }
 }

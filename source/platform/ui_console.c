@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <switch.h>
 
-#include "text_ru.h"
+#include "text.h"
 
 #define ANSI_RED_BOLD CONSOLE_RED
 #define ANSI_RESET CONSOLE_RESET
@@ -61,7 +61,7 @@ static void draw_init_error(const char *init_error)
 void ui_draw_menu(const config_t *cfg, const experiment_t *experiment, const char *config_error, const char *destination_url, const char *init_error)
 {
     consoleClear();
-    printf("%s\n%s\n\n", TXT_TITLE, TXT_FONT_PROBE);
+    printf("%s\n\n", TXT_TITLE);
     draw_init_error(init_error);
     if (cfg != NULL) {
         draw_config_summary(cfg, experiment, destination_url);

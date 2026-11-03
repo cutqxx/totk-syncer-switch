@@ -1,0 +1,8 @@
+config.json
+build/
+*.nro
+*.elf
+*.nacp
+*.nso
+*.map
+*.local.md

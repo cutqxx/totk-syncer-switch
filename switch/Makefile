@@ -125,7 +125,9 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
 ifeq ($(strip $(CONFIG_JSON)),)
-	jsons := $(wildcard *.json)
+	# Template autodetect disabled: any *.json here named config.json (or containing
+	# "config.json", e.g. switch-config.json) would silently turn the build into an NSP.
+	jsons :=
 	ifneq (,$(findstring $(TARGET).json,$(jsons)))
 		export APP_JSON := $(TOPDIR)/$(TARGET).json
 	else

@@ -18,24 +18,31 @@
 
 ## Сборка
 
-Путь проекта может содержать пробелы и кириллицу, а Makefile devkitPro этого не переносит. Поэтому используйте `build.ps1`: он монтирует проект на свободную букву диска (T..Z) через `subst`, запускает make и снимает подстановку.
+Приложение для Switch лежит в каталоге `switch/` (`Makefile`, `source/`, `tests/`, `third_party/`, `config.example.json`). `build.ps1` остаётся в корне репозитория.
+
+Путь проекта может содержать пробелы и кириллицу, а Makefile devkitPro этого не переносит. Поэтому используйте `build.ps1` из корня репозитория: он монтирует корень на свободную букву диска (T..Z) через `subst`, запускает make в `switch/` и снимает подстановку.
 
 ```
-pwsh -File build.ps1 nro     # собрать totk-sync.nro
-pwsh -File build.ps1 test    # хостовые тесты (gcc UCRT64, без devkitPro и сети)
+pwsh -File build.ps1 nro         # собрать switch/totk-sync.nro
+pwsh -File build.ps1 test        # хостовые тесты (gcc UCRT64, без devkitPro и сети)
 pwsh -File build.ps1 clean
+pwsh -File build.ps1 pc-test     # тесты PC-лаунчера (dotnet test pc/TotkSync.slnx)
+pwsh -File build.ps1 pc-publish  # публикация PC-лаунчера (профиль win-x64)
+pwsh -File build.ps1 test-all    # test + pc-test
 ```
 
-Из оболочки MSYS2 в каталоге без пробелов работают напрямую `make` (после `source /etc/profile.d/devkit-env.sh`) и `make test`.
+Готовый файл: `switch/totk-sync.nro`. Цели `pc-*` ищут `dotnet` в PATH, иначе в `C:\Program Files\dotnet\dotnet.exe`; пока каталога `pc/` нет, они завершаются с понятной ошибкой.
 
-Не кладите `config.json` в корень репозитория: шаблон Makefile libnx принимает его за конфиг NPDM. Свой конфиг держите на SD-карте.
+Из оболочки MSYS2 в каталоге без пробелов работают напрямую `make` (после `source /etc/profile.d/devkit-env.sh`) и `make test` в каталоге `switch/`.
+
+Автоопределение конфига NPDM (`*.json` рядом с Makefile) в `switch/Makefile` отключено, так что случайный `config.json` или `switch-config.json` в `switch/` не превратит сборку в NSP. Всё равно держите свой конфиг на SD-карте, а не в репозитории.
 
 ## Что положить на SD-карту
 
 | Файл | Куда |
 | --- | --- |
-| `totk-sync.nro` | `sd:/switch/totk-sync/totk-sync.nro` |
-| `config.json` (по образцу `config.example.json`) | `sd:/config/totk-sync/config.json` |
+| `switch/totk-sync.nro` | `sd:/switch/totk-sync/totk-sync.nro` |
+| `config.json` (по образцу `switch/config.example.json`) | `sd:/config/totk-sync/config.json` |
 | `test.zip` (любой файл от 1 байта до 64 МБ) | `sd:/switch/totk-sync/test.zip` |
 | `ca.pem` (необязательно) | `sd:/switch/totk-sync/ca.pem` |
 
@@ -72,7 +79,7 @@ pwsh -File build.ps1 clean
 
 При каждом запуске приложения выбран вариант по умолчанию: сервер из конфига, Expect выкл., Content-Length, обычные таймауты. Выбор не сохраняется. Проверка TLS включена во всех вариантах.
 
-Встроенная библиотека JSON: [cJSON](https://github.com/DaveGamble/cJSON), тег v1.7.18, лицензия MIT (`third_party/cjson/`).
+Встроенная библиотека JSON: [cJSON](https://github.com/DaveGamble/cJSON), тег v1.7.18, лицензия MIT (`switch/third_party/cjson/`).
 
 ## Предупреждения перед запуском на железе
 

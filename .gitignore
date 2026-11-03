@@ -1,4 +1,5 @@
 config.json
+switch-config.json
 build/
 *.nro
 *.elf
@@ -6,3 +7,15 @@ build/
 *.nso
 *.map
 *.local.md
+
+# .NET
+bin/
+obj/
+.vs/
+*.user
+pc/artifacts/
+
+# Untracked Phase 0 artefacts at the repo root
+/log.txt
+/test.zip
+/testdata/

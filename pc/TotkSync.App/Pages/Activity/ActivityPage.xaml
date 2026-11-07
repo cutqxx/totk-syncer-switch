@@ -1,0 +1,10 @@
+<Page x:Class="TotkSync.App.Pages.Activity.ActivityPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:TotkSync.App.Controls">
+    <controls:PageFrame Title="Activity">
+        <controls:EmptyState Title="No requests yet"
+                             Body="When the Switch connects, its requests show up here. This window must stay open."
+                             Symbol="History24" />
+    </controls:PageFrame>
+</Page>

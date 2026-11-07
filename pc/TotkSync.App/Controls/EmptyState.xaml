@@ -1,0 +1,25 @@
+<UserControl x:Class="TotkSync.App.Controls.EmptyState"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             x:Name="Root"
+             Focusable="False">
+    <StackPanel HorizontalAlignment="Center"
+                Margin="{StaticResource Space.TopXL}"
+                MaxWidth="420">
+        <ui:SymbolIcon HorizontalAlignment="Center"
+                       FontSize="48"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       Symbol="{Binding Symbol, ElementName=Root}" />
+        <ui:TextBlock Margin="{StaticResource Space.TopM}"
+                      HorizontalAlignment="Center"
+                      FontTypography="BodyStrong"
+                      Text="{Binding Title, ElementName=Root}" />
+        <ui:TextBlock Margin="{StaticResource Space.TopS}"
+                      HorizontalAlignment="Center"
+                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                      Text="{Binding Body, ElementName=Root}"
+                      TextAlignment="Center"
+                      TextWrapping="Wrap" />
+    </StackPanel>
+</UserControl>

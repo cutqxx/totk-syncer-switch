@@ -1,0 +1,98 @@
+<Page x:Class="TotkSync.App.Pages.Settings.SettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:TotkSync.App.Controls"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <controls:PageFrame Title="Settings">
+        <StackPanel>
+            <ui:TextBlock FontTypography="BodyStrong" Text="Game" />
+
+            <ui:CardControl Margin="{StaticResource Space.TopS}" Icon="{ui:SymbolIcon Folder24}">
+                <ui:CardControl.Header>
+                    <controls:SettingHeader Title="Game folder" Description="Folder that contains totk.exe." />
+                </ui:CardControl.Header>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock MaxWidth="360"
+                               VerticalAlignment="Center"
+                               AutomationProperties.Name="Game folder"
+                               Style="{StaticResource MachineValueText}"
+                               Text="{Binding GameFolderText}"
+                               ToolTip="{Binding GameFolderText}" />
+                    <ui:Button Margin="{StaticResource Space.LeftS}"
+                               Command="{Binding BrowseGameFolderCommand}"
+                               Content="Browse…" />
+                </StackPanel>
+            </ui:CardControl>
+            <controls:FieldError Message="{Binding GameFolderError}" />
+
+            <ui:CardControl Margin="{StaticResource Space.TopS}" Icon="{ui:SymbolIcon Save24}">
+                <ui:CardControl.Header>
+                    <controls:SettingHeader Title="Save folder"
+                                            Description="Found automatically in &lt;game folder&gt;\profile. Set it only if the wrong folder is detected." />
+                </ui:CardControl.Header>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock MaxWidth="360"
+                               VerticalAlignment="Center"
+                               AutomationProperties.Name="Save folder"
+                               Style="{StaticResource MachineValueText}"
+                               Text="{Binding SaveFolderText}"
+                               ToolTip="{Binding SaveFolderText}" />
+                    <ui:Button Margin="{StaticResource Space.LeftS}"
+                               Command="{Binding BrowseSaveFolderCommand}"
+                               Content="Browse…" />
+                    <ui:Button Margin="{StaticResource Space.LeftS}"
+                               Command="{Binding UseAutomaticSaveFolderCommand}"
+                               Content="Use automatic"
+                               Visibility="{Binding IsSaveFolderCustom, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </ui:CardControl>
+
+            <ui:TextBlock Margin="{StaticResource Space.TopXL}" FontTypography="BodyStrong" Text="Network" />
+
+            <ui:CardControl Margin="{StaticResource Space.TopS}" Icon="{ui:SymbolIcon Server24}">
+                <ui:CardControl.Header>
+                    <controls:SettingHeader Title="Port" Description="The Switch connects to this port. Default: 8765." />
+                </ui:CardControl.Header>
+                <ui:NumberBox Width="160"
+                              AutomationProperties.HelpText="{Binding PortError}"
+                              AutomationProperties.Name="Port"
+                              MaxDecimalPlaces="0"
+                              SpinButtonPlacementMode="Hidden"
+                              ValueChanged="OnPortValueChanged"
+                              Value="{Binding PortValue, Mode=OneWay}" />
+            </ui:CardControl>
+            <controls:FieldError Message="{Binding PortError}" />
+
+            <ui:TextBlock Margin="{StaticResource Space.TopXL}" FontTypography="BodyStrong" Text="Backups" />
+
+            <ui:CardControl Margin="{StaticResource Space.TopS}" Icon="{ui:SymbolIcon Archive24}">
+                <ui:CardControl.Header>
+                    <controls:SettingHeader Title="Backups to keep" Description="Older launcher backups are deleted automatically." />
+                </ui:CardControl.Header>
+                <ui:NumberBox Width="160"
+                              AutomationProperties.HelpText="{Binding KeepBackupsError}"
+                              AutomationProperties.Name="Backups to keep"
+                              MaxDecimalPlaces="0"
+                              SpinButtonPlacementMode="Hidden"
+                              ValueChanged="OnKeepBackupsValueChanged"
+                              Value="{Binding KeepBackupsValue, Mode=OneWay}" />
+            </ui:CardControl>
+            <controls:FieldError Message="{Binding KeepBackupsError}" />
+
+            <ui:TextBlock Margin="{StaticResource Space.TopXL}" FontTypography="BodyStrong" Text="About" />
+
+            <ui:CardControl Margin="{StaticResource Space.TopS}" Icon="{ui:SymbolIcon Info24}">
+                <ui:CardControl.Header>
+                    <controls:SettingHeader Title="{Binding AboutTitle}"
+                                            Description="{Binding DataFolderText}" />
+                </ui:CardControl.Header>
+                <ui:Button Command="{Binding OpenDataFolderCommand}"
+                           Content="Open data folder"
+                           Icon="{ui:SymbolIcon FolderOpen24}" />
+            </ui:CardControl>
+            <ui:TextBlock Margin="{StaticResource Space.TopS}"
+                          Style="{StaticResource CaptionText}"
+                          Text="Follows your Windows light or dark theme." />
+        </StackPanel>
+    </controls:PageFrame>
+</Page>

@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="TotkSync.App/TotkSync.App.csproj" />
+  <Project Path="TotkSync.Core/TotkSync.Core.csproj" />
+  <Project Path="TotkSync.Tests/TotkSync.Tests.csproj" />
+</Solution>

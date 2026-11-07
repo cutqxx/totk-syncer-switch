@@ -1,0 +1,10 @@
+<Page x:Class="TotkSync.App.Pages.Backups.BackupsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:TotkSync.App.Controls">
+    <controls:PageFrame Title="Backups">
+        <controls:EmptyState Title="No backups yet"
+                             Body="A backup of your PC save is made automatically before the Switch replaces it."
+                             Symbol="Archive24" />
+    </controls:PageFrame>
+</Page>

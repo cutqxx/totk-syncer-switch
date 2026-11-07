@@ -1,3 +1,4 @@
+using TotkSync.App.Services;
 using TotkSync.Server;
 using Wpf.Ui.Controls;
 
@@ -32,7 +33,7 @@ public static class ServerCardPresenter
                 Tone = StatusTone.Success,
                 Word = "Running",
                 Detail = $"Listening on port {state.Port}",
-                Addresses = state.Addresses.Select(address => $"http://{address}:{state.Port}").ToList(),
+                Addresses = state.Addresses.Select(address => ServerAddress.For(address, state.Port)).ToList(),
             };
     }
 

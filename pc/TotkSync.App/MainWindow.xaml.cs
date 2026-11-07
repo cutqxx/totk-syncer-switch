@@ -3,6 +3,7 @@ using System.Windows;
 using TotkSync.App.Pages.Home;
 using TotkSync.App.Services;
 using TotkSync.Server;
+using Wpf.Ui;
 using Wpf.Ui.Animations;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
@@ -15,11 +16,18 @@ public partial class MainWindow : FluentWindow
     private bool _isClosing;
     private bool _isServerStopped;
 
-    public MainWindow(IServiceProvider services, Navigator navigator, ServerHost server)
+    public MainWindow(
+        IServiceProvider services,
+        Navigator navigator,
+        ServerHost server,
+        IContentDialogService dialogs,
+        ISnackbarService snackbar)
     {
         _server = server;
         InitializeComponent();
         SystemThemeWatcher.Watch(this);
+        dialogs.SetDialogHost(RootContentDialog);
+        snackbar.SetSnackbarPresenter(SnackbarHost);
         Navigation.SetServiceProvider(services);
         navigator.Attach(pageType => Navigation.Navigate(pageType));
         DisableTransitionsWhenWindowsAnimationsAreOff();

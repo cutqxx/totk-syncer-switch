@@ -27,13 +27,69 @@ public sealed class ServerHost(
     IPAddress listenAddress,
     Func<IReadOnlyList<IPAddress>> detectLanAddresses)
 {
+    private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private LanServer? _server;
+    private bool _isStopRequested;
 
     public ServerState State { get; private set; } = ServerState.Starting(settings.Current.Port);
 
     public event Action? Changed;
 
     public async Task StartAsync()
+    {
+        await _lifecycle.WaitAsync();
+        try
+        {
+            _isStopRequested = false;
+            if (_server is null)
+            {
+                await StartCoreAsync();
+            }
+        }
+        finally
+        {
+            _lifecycle.Release();
+        }
+    }
+
+    public async Task StopAsync()
+    {
+        await _lifecycle.WaitAsync();
+        try
+        {
+            _isStopRequested = true;
+            await StopCoreAsync();
+        }
+        finally
+        {
+            _lifecycle.Release();
+        }
+    }
+
+    public async Task RestartIfPortChangedAsync()
+    {
+        await _lifecycle.WaitAsync();
+        try
+        {
+            if (IsRunningOnStalePort())
+            {
+                await StopCoreAsync();
+                await StartCoreAsync();
+            }
+        }
+        finally
+        {
+            _lifecycle.Release();
+        }
+    }
+
+    private bool IsRunningOnStalePort()
+    {
+        var hasSettled = State.Phase is ServerPhase.Running or ServerPhase.PortBusy or ServerPhase.Failed;
+        return !_isStopRequested && hasSettled && State.Port != settings.Current.Port;
+    }
+
+    private async Task StartCoreAsync()
     {
         var port = settings.Current.Port;
         Publish(ServerState.Starting(port));
@@ -43,7 +99,7 @@ public sealed class ServerHost(
         Publish(ToState(result, port, addresses));
     }
 
-    public async Task StopAsync()
+    private async Task StopCoreAsync()
     {
         var server = _server;
         _server = null;

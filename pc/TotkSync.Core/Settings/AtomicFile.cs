@@ -6,11 +6,33 @@ internal static class AtomicFile
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var tempPath = path + ".tmp";
-        using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
+        try
         {
-            stream.Write(content);
-            stream.Flush(flushToDisk: true);
+            WriteTemp(tempPath, content);
+            File.Move(tempPath, path, overwrite: true);
         }
-        File.Move(tempPath, path, overwrite: true);
+        catch
+        {
+            TryDelete(tempPath);
+            throw;
+        }
+    }
+
+    private static void WriteTemp(string tempPath, byte[] content)
+    {
+        using var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write);
+        stream.Write(content);
+        stream.Flush(flushToDisk: true);
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 }

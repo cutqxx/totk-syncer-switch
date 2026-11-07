@@ -44,5 +44,10 @@
                                        TargetPageType="{x:Type settings:SettingsPage}" />
             </ui:NavigationView.FooterMenuItems>
         </ui:NavigationView>
+
+        <ui:ContentDialogHost x:Name="RootContentDialog" Grid.Row="0" Grid.RowSpan="2" />
+        <ui:SnackbarPresenter x:Name="SnackbarHost"
+                              Grid.Row="1"
+                              VerticalAlignment="Bottom" />
     </Grid>
 </ui:FluentWindow>

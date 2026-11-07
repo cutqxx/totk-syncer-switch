@@ -74,6 +74,7 @@ public sealed partial class HomeViewModel : ObservableObject
         {
             return;
         }
+        var isFirstRun = !IsConfigured;
         var error = await _settings.SetGameDirAsync(path);
         GameFolderError = error ?? "";
         if (error is not null)
@@ -83,6 +84,10 @@ public sealed partial class HomeViewModel : ObservableObject
         }
         _setupInProgress = true;
         UpdateVisibility();
+        if (isFirstRun)
+        {
+            await ServerCard.Pairing.ShowFirewallHelpAsync();
+        }
     }
 
     [RelayCommand]

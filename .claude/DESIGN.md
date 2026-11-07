@@ -503,6 +503,7 @@ Windows 11 Settings pattern: section headers (BodyStrong) + `ui:CardControl` row
 | About | `TotK Save Sync <version>` | `Data folder: %LOCALAPPDATA%\TotkSync (settings, activity log, backups)` · `Follows your Windows light or dark theme.` | `Open data folder` | |
 
 - A committed port change shows the `Port changed` InfoBar (8). The new port takes effect after the launcher restarts; the running server is not restarted live.
+  - Слайс 1.3: вместо перезапуска лаунчера сервер перезапускается сам; напоминание пересохранить switch-config.json показывается InfoBar.
 - The Port and Backups NumberBoxes have `AutomationProperties.Name` = row header, and the error text is linked via `AutomationProperties.HelpText`.
 - The "Change port" action from the port-busy banner navigates here and focuses Port.
 
@@ -573,6 +574,7 @@ Banner strings: section 8. Activity result strings: section 11. Firewall dialog:
 3. **Firewall:** no "Run as administrator" button; the dialog gives the `netsh` command + Copy only.
 4. **`Open network settings`** link (`ms-settings:network-status`) in the firewall dialog: included.
 5. **Port change** applies after restarting the launcher (no live server restart).
+   - Слайс 1.3: вместо перезапуска лаунчера сервер перезапускается сам; напоминание пересохранить switch-config.json показывается InfoBar.
 6. **Firewall dialog** opens automatically once, right after the game folder is accepted on first run.
 7. **Window title / product name:** `TotK Save Sync`.
 8. **Activity log persists across restarts:** last 500 entries in a file under `%LOCALAPPDATA%\TotkSync\`, never the token. Page states: loading, loaded, empty, unreadable-file warning (section 11). "Clear log" is not added (reasoning in section 11).

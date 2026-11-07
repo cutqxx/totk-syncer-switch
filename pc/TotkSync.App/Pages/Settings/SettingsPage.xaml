@@ -63,6 +63,13 @@
                               Value="{Binding PortValue, Mode=OneWay}" />
             </ui:CardControl>
             <controls:FieldError Message="{Binding PortError}" />
+            <ui:InfoBar Title="{Binding PortChangedTitle}"
+                        Margin="{StaticResource Space.TopS}"
+                        AutomationProperties.LiveSetting="Polite"
+                        IsClosable="True"
+                        IsOpen="{Binding IsPortChangedVisible, Mode=TwoWay}"
+                        Message="Save switch-config.json again."
+                        Severity="Informational" />
 
             <ui:TextBlock Margin="{StaticResource Space.TopXL}" FontTypography="BodyStrong" Text="Backups" />
 

@@ -14,17 +14,32 @@ public sealed partial class ServerCardViewModel : ObservableObject
     private readonly ServerHost _host;
     private readonly Navigator _navigator;
     private readonly UiThread _ui;
+    private readonly ClipboardService _clipboard;
+    private readonly Toast _toast;
 
-    public ServerCardViewModel(ServerHost host, ActivityLog activity, UiThread ui, Navigator navigator)
+    public ServerCardViewModel(
+        ServerHost host,
+        ActivityLog activity,
+        UiThread ui,
+        Navigator navigator,
+        PairingViewModel pairing,
+        ClipboardService clipboard,
+        Toast toast)
     {
         _host = host;
         _navigator = navigator;
         _ui = ui;
+        _clipboard = clipboard;
+        _toast = toast;
+        Pairing = pairing;
+        Pairing.IsServerRunning = host.State.Phase == ServerPhase.Running;
         Card = ServerCardPresenter.From(host.State);
         LastRequestText = NoRequestsText;
         host.Changed += ApplyState;
         activity.EntryAdded += entry => _ui.Post(() => ShowLastRequest(entry));
     }
+
+    public PairingViewModel Pairing { get; }
 
     [ObservableProperty]
     public partial ServerCardModel Card { get; set; }
@@ -33,10 +48,19 @@ public sealed partial class ServerCardViewModel : ObservableObject
     public partial string LastRequestText { get; set; }
 
     [ObservableProperty]
-    public partial string? SelectedAddress { get; set; }
+    public partial ServerAddress? SelectedAddress { get; set; }
 
     [RelayCommand]
     private Task RetryAsync() => _host.StartAsync();
+
+    [RelayCommand]
+    private void CopyAddress()
+    {
+        if (SelectedAddress is { } address && _clipboard.TryCopy(address.Url))
+        {
+            _toast.Show("Address copied");
+        }
+    }
 
     [RelayCommand]
     private void ChangePort() => _navigator.ShowSettings();
@@ -44,8 +68,18 @@ public sealed partial class ServerCardViewModel : ObservableObject
     private void ApplyState()
     {
         Card = ServerCardPresenter.From(_host.State);
-        SelectedAddress = Card.Addresses.Contains(SelectedAddress ?? "") ? SelectedAddress : Card.FirstAddress;
+        Pairing.IsServerRunning = _host.State.Phase == ServerPhase.Running;
+        SelectedAddress = KeptAddress() ?? Card.FirstAddress;
     }
+
+    private ServerAddress? KeptAddress()
+    {
+        return SelectedAddress is { } current
+            ? Card.Addresses.FirstOrDefault(address => address.Ip.Equals(current.Ip))
+            : null;
+    }
+
+    partial void OnSelectedAddressChanged(ServerAddress? value) => Pairing.SelectedAddress = value;
 
     private void ShowLastRequest(ActivityEntry entry)
     {

@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using TotkSync.App.Services;
 using TotkSync.Core.Settings;
 using TotkSync.Core.Status;
+using TotkSync.Server;
 
 namespace TotkSync.App.Pages.Settings;
 
@@ -16,23 +17,27 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly FolderPicker _picker;
     private readonly ShellOpener _shell;
     private readonly AppDataPaths _paths;
+    private readonly ServerHost _server;
 
     public SettingsViewModel(
         SettingsSession settings,
         SaveStatusCache cache,
         FolderPicker picker,
         ShellOpener shell,
-        AppDataPaths paths)
+        AppDataPaths paths,
+        ServerHost server)
     {
         _settings = settings;
         _cache = cache;
         _picker = picker;
         _shell = shell;
         _paths = paths;
+        _server = server;
         GameFolderError = "";
         SaveFolderError = "";
         DataFolderError = "";
         PortError = "";
+        PortChangedTitle = "";
         KeepBackupsError = "";
         Refresh();
         _settings.Changed += Refresh;
@@ -66,12 +71,29 @@ public sealed partial class SettingsViewModel : ObservableObject
     public partial string PortError { get; set; }
 
     [ObservableProperty]
+    public partial bool IsPortChangedVisible { get; set; }
+
+    [ObservableProperty]
+    public partial string PortChangedTitle { get; set; }
+
+    [ObservableProperty]
     public partial string KeepBackupsError { get; set; }
 
     public async Task CommitPortAsync(double? value)
     {
         var port = AsInteger(value);
-        PortError = port == _settings.Current.Port ? "" : await _settings.SetPortAsync(port) ?? "";
+        if (port == _settings.Current.Port)
+        {
+            PortError = "";
+            return;
+        }
+        PortError = await _settings.SetPortAsync(port) ?? "";
+        if (PortError.Length == 0)
+        {
+            await _server.RestartIfPortChangedAsync();
+            PortChangedTitle = $"Port changed to {port}";
+            IsPortChangedVisible = true;
+        }
     }
 
     public async Task CommitKeepBackupsAsync(double? value)

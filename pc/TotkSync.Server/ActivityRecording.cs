@@ -19,9 +19,21 @@ internal static class ActivityRecording
             }
             finally
             {
-                log.Append(EntryFor(context, time));
+                TryAppend(log, context, time);
             }
         };
+    }
+
+    private static void TryAppend(ActivityLog log, HttpContext context, TimeProvider time)
+    {
+        try
+        {
+            log.Append(EntryFor(context, time));
+        }
+        catch (Exception)
+        {
+            // Recording is best effort: it must never replace the outcome of the request being recorded.
+        }
     }
 
     private static ActivityEntry EntryFor(HttpContext context, TimeProvider time)

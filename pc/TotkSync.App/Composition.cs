@@ -12,6 +12,7 @@ using TotkSync.Core.Pairing;
 using TotkSync.Core.Status;
 using TotkSync.Server;
 using TotkSync.Core.Sync;
+using Wpf.Ui;
 
 namespace TotkSync.App;
 
@@ -53,11 +54,18 @@ public static class Composition
         services.AddSingleton<ShellOpener>();
         services.AddSingleton<Navigator>();
         services.AddSingleton<UiThread>();
+        services.AddSingleton<ClipboardService>();
+        services.AddSingleton<SaveFilePicker>();
+        services.AddSingleton<Toast>();
+        services.AddSingleton<FirewallHelpPresenter>();
+        services.AddSingleton<IContentDialogService, ContentDialogService>();
+        services.AddSingleton<ISnackbarService, SnackbarService>();
         services.AddSingleton<MainWindow>();
     }
 
     private static void AddPages(IServiceCollection services)
     {
+        services.AddSingleton<PairingViewModel>();
         services.AddSingleton<ServerCardViewModel>();
         services.AddSingleton<HomeViewModel>();
         services.AddSingleton<HomePage>();

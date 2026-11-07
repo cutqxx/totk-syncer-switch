@@ -7,6 +7,8 @@ namespace TotkSync.App.Services;
 
 public sealed class ShellOpener
 {
+    private const string NetworkSettingsUri = "ms-settings:network-status";
+
     public Task<string?> OpenFolderAsync(string dir)
     {
         return Task.Run(() => OpenExisting(dir));
@@ -26,6 +28,19 @@ public sealed class ShellOpener
             }
             return OpenExisting(paths.Root);
         });
+    }
+
+    public string? OpenNetworkSettings()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(NetworkSettingsUri) { UseShellExecute = true })?.Dispose();
+            return null;
+        }
+        catch (Win32Exception error)
+        {
+            return $"Couldn't open network settings: {error.Message}";
+        }
     }
 
     private static string? OpenExisting(string dir)

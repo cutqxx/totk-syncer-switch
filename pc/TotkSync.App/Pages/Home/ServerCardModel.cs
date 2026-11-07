@@ -1,3 +1,4 @@
+using TotkSync.App.Services;
 using Wpf.Ui.Controls;
 
 namespace TotkSync.App.Pages.Home;
@@ -22,7 +23,7 @@ public sealed record ServerCardModel
 
     public bool IsError { get; init; }
 
-    public IReadOnlyList<string> Addresses { get; init; } = [];
+    public IReadOnlyList<ServerAddress> Addresses { get; init; } = [];
 
     public bool HasDetail => Detail.Length > 0;
 
@@ -30,5 +31,7 @@ public sealed record ServerCardModel
 
     public bool HasSeveralAddresses => Addresses.Count > 1;
 
-    public string FirstAddress => Addresses.Count > 0 ? Addresses[0] : "";
+    public ServerAddress? FirstAddress => Addresses.Count > 0 ? Addresses[0] : null;
+
+    public string FirstUrl => FirstAddress?.Url ?? "";
 }

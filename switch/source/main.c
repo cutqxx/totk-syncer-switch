@@ -3,87 +3,63 @@
 
 #include "clock_nx.h"
 #include "config.h"
-#include "experiment.h"
 #include "http_curl.h"
 #include "log.h"
-#include "ts_limits.h"
-#include "session.h"
+#include "main_screen.h"
+#include "pc_status.h"
+#include "ports.h"
 #include "text.h"
 #include "ui_console.h"
-#include "url.h"
 
 #define SD_ROOT "sdmc:"
 
-static upload_port_t make_port(void)
+static void draw(const config_t *cfg, const char *blocking_error, const pc_status_t *status)
 {
-    upload_port_t port = {
-        .ctx = NULL,
-        .perform = http_curl_perform,
-        .sleep_seconds = clock_sleep_seconds,
-        .now_local = clock_now_local,
-        .show_line = ui_show_line,
-    };
-    return port;
+    char text[MAIN_SCREEN_SIZE];
+    main_screen_render(cfg, blocking_error, status, text, sizeof text);
+    ui_draw_screen(text);
 }
 
-static void preview_destination(const config_t *cfg, const experiment_t *experiment, char *out, size_t out_size)
+static void refresh_status(const sync_env_t *env, const config_t *cfg, pc_status_t *status)
 {
-    struct tm now;
-    char remote_name[64];
-    char origin[TS_URL_SIZE];
-    clock_now_local(NULL, &now);
-    url_format_remote_name(&now, remote_name, sizeof remote_name);
-    experiment_origin(experiment, cfg->origin, origin, sizeof origin);
-    url_build_destination(origin, cfg->basepath, remote_name, out, out_size);
+    draw(cfg, NULL, NULL);
+    pc_status_refresh(env, cfg, status);
+    draw(cfg, NULL, status);
 }
 
-static void draw_menu(const config_t *cfg, const experiment_t *experiment, const char *config_error, const char *init_error)
+static void wait_for_exit(PadState *pad)
 {
-    char destination[TS_URL_SIZE] = "";
-    if (cfg != NULL) {
-        preview_destination(cfg, experiment, destination, sizeof destination);
+    while (appletMainLoop()) {
+        padUpdate(pad);
+        if (padGetButtonsDown(pad) & HidNpadButton_Plus) {
+            break;
+        }
+        consoleUpdate(NULL);
     }
-    ui_draw_menu(cfg, experiment, config_error, destination, init_error);
 }
 
-static bool is_toggle_pressed(u64 pressed, u64 button, exp_param_t param, experiment_t *experiment)
+static void run_connected_loop(PadState *pad, const config_t *cfg)
 {
-    if (!(pressed & button)) {
-        return false;
-    }
-    experiment_toggle(experiment, param);
-    return true;
-}
-
-static bool apply_toggles(u64 pressed, experiment_t *experiment)
-{
-    bool is_server = is_toggle_pressed(pressed, HidNpadButton_X, EXP_PARAM_SERVER, experiment);
-    bool is_expect = is_toggle_pressed(pressed, HidNpadButton_Y, EXP_PARAM_EXPECT, experiment);
-    bool is_body = is_toggle_pressed(pressed, HidNpadButton_L, EXP_PARAM_BODY, experiment);
-    bool is_timeouts = is_toggle_pressed(pressed, HidNpadButton_R, EXP_PARAM_TIMEOUTS, experiment);
-    return is_server || is_expect || is_body || is_timeouts;
-}
-
-static void run_main_loop(PadState *pad, const config_t *cfg, bool is_config_loaded, const char *config_error, const char *init_error)
-{
-    upload_port_t port = make_port();
-    experiment_t experiment = experiment_default(is_config_loaded ? cfg->origin : "");
+    const net_port_t net = { .ctx = NULL, .perform = http_curl_perform };
+    const clock_port_t clock = { .ctx = NULL, .now_local = clock_now_local, .sleep_seconds = clock_sleep_seconds };
+    const ui_port_t ui = { .ctx = NULL, .show_line = ui_show_line };
     log_sink_t log;
-    log_sink_init(&log, SD_ROOT);
-    session_inputs_t inputs = { cfg, SD_ROOT, &experiment, &log };
-    const config_t *menu_config = is_config_loaded ? cfg : NULL;
-    draw_menu(menu_config, &experiment, config_error, init_error);
+    log_sink_init(&log, SD_ROOT, cfg->token);
+    const sync_env_t env = { &net, &clock, &ui, &log };
+    pc_status_t status;
+
+    refresh_status(&env, cfg, &status);
     while (appletMainLoop()) {
         padUpdate(pad);
         u64 pressed = padGetButtonsDown(pad);
         if (pressed & HidNpadButton_Plus) {
             break;
         }
-        if (is_config_loaded && apply_toggles(pressed, &experiment)) {
-            draw_menu(menu_config, &experiment, config_error, init_error);
+        if (pressed & HidNpadButton_R) {
+            refresh_status(&env, cfg, &status);
         }
-        if ((pressed & HidNpadButton_A) && is_config_loaded) {
-            session_upload_test_file(&inputs, &port);
+        if (pressed & HidNpadButton_A) {
+            ui_show_line(NULL, TXT_SEND_NOT_AVAILABLE);
         }
         consoleUpdate(NULL);
     }
@@ -104,20 +80,32 @@ static bool init_network(char *error, size_t error_size)
     return true;
 }
 
+static void run_blocked(PadState *pad, const char *blocking_error)
+{
+    draw(NULL, blocking_error, NULL);
+    wait_for_exit(pad);
+}
+
 int main(void)
 {
     PadState pad;
     config_t cfg;
-    config_error_t error;
+    config_error_t config_error;
     char init_error[96] = "";
 
     ui_init();
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     padInitializeDefault(&pad);
     bool is_network_ready = init_network(init_error, sizeof init_error);
+    bool is_config_loaded = config_load(SD_ROOT, &cfg, &config_error) == CONFIG_OK;
 
-    bool is_config_loaded = config_load(SD_ROOT, &cfg, &error) == CONFIG_OK;
-    run_main_loop(&pad, &cfg, is_config_loaded, error.message, init_error);
+    if (!is_config_loaded) {
+        run_blocked(&pad, config_error.message);
+    } else if (!is_network_ready) {
+        run_blocked(&pad, init_error);
+    } else {
+        run_connected_loop(&pad, &cfg);
+    }
 
     if (is_network_ready) {
         http_curl_global_cleanup();

@@ -15,7 +15,4 @@ void redact_headers_append(char *out, size_t out_size, const char *text, size_t 
    secret has characters when it is shorter than 3). No-op for NULL or empty secret. */
 void redact_secret_inplace(char *text, const char *secret);
 
-/* Scrubs base64("username:password") and then the password itself. */
-void redact_basic_credentials_inplace(char *text, const char *username, const char *password);
-
 #endif

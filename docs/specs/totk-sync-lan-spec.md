@@ -97,20 +97,21 @@ Switch (totk-sync.nro) ──HTTP по LAN + токен──▶ ПК-лаунч
 ## Slice 1.4: Switch — подключение к ПК (сквозной ходячий скелет)
 
 - [ ] [HW] Главный экран показывает путь к конфигу, адрес ПК `http://<pc_host>:<pc_port>`, строку статуса ПК и подсказки кнопок `A - Send to PC`, `R - refresh`, `+ - exit`.
-- [ ] [HW] Строка статуса ПК — одна из: `PC: online, save from <YYYY-MM-DD HH:MM>`, `PC: online, no save`, `PC: TotK is running`, `PC: not reachable`. Она обновляется при запуске и по кнопке R.
+- [ ] [HW] Строка статуса ПК — одна из: `PC: online, save from <YYYY-MM-DD HH:MM>`, `PC: online, no save`, `PC: TotK is running`, `PC: not reachable`, `PC: error` (ответ получен, но не годится; сообщение об ошибке — строкой ниже). Она обновляется при запуске и по кнопке R.
 - [ ] [HW] Токен не отображается на экране ни в каком виде.
-- [ ] [host] Конфиг читается из `sd:/config/totk-sync/config.json`: поля `pc_host`, `pc_port`, `token` и необязательное `keep_backups` (по умолчанию 20).
-- [ ] [host] Если обязательного поля нет или оно пустое, показывается сообщение с именем поля и путём к файлу, а сетевые действия недоступны.
-- [ ] [host] Если `pc_host` не является IPv4-адресом из частных диапазонов, показывается ошибка конфигурации. Запросы идут только по `http://` на `pc_host:pc_port`.
-- [ ] [host] Если в конфиге остались только поля Яндекса из фазы 0 (`origin`, `username`, `password`), показывается `Old Phase 0 config: save switch-config.json from the PC launcher`.
-- [ ] [host] Каждый запрос передаёт токен в заголовке `Authorization`. В `log.txt` значение этого заголовка заменено на `***`, и строка токена не встречается в логе нигде.
-- [ ] [host] Сообщения об ошибках:
+- [x] [host] Конфиг читается из `sd:/config/totk-sync/config.json`: поля `pc_host`, `pc_port`, `token` и необязательное `keep_backups` (по умолчанию 20).
+- [x] [host] Если обязательного поля нет или оно пустое, показывается сообщение с именем поля и путём к файлу, а сетевые действия недоступны.
+- [x] [host] Если `pc_host` не является IPv4-адресом из частных диапазонов (10/8, 172.16/12, 192.168/16; `127/8` для `pc_host` не допускается, это адрес самой Switch), показывается ошибка конфигурации. Запросы идут только по `http://` на `pc_host:pc_port`.
+- [x] [host] Если в конфиге остались только поля Яндекса из фазы 0 (`origin`, `username`, `password`), показывается `Old Phase 0 config: save switch-config.json from the PC launcher`.
+- [x] [host] Каждый запрос передаёт токен в заголовке `Authorization`. В `log.txt` значение этого заголовка заменено на `***`, и строка токена не встречается в логе нигде.
+- [x] [host] Сообщения об ошибках:
   - неверный токен → `Wrong token: save switch-config.json from the PC launcher`;
-  - curl 6/7/28 → `PC not reachable: is the launcher open? check firewall`;
+  - curl 6/7/28 → `PC not reachable: is the launcher open? check firewall and same Wi-Fi`;
   - ответ без признака лаунчера → `Not a TotK Sync launcher at <host>:<port>`;
+  - 403 от лаунчера (клиент не из частной сети) → `PC refused this connection (HTTP 403): Switch must be in the same private network`;
   - любой другой ответ → `PC error: HTTP <code>`.
-- [ ] [host] Таймаут соединения 5 с, общий таймаут 60 с. При curl 6/7/28/56 выполняется 1 повтор через 3 с.
-- [ ] [repo] Из приложения убраны: меню экспериментов фазы 0, загрузка `test.zip`, строки про Яндекс/WebDAV и запасной конфиг `sd:/config/JKSV/webdav.json`. `config.example.json` и README описывают новый формат.
+- [x] [host] Таймаут соединения 5 с, общий таймаут 60 с. При curl 6/7/28/56 выполняется 1 повтор через 3 с.
+- [x] [repo] Из приложения убраны: меню экспериментов фазы 0, загрузка `test.zip`, строки про Яндекс/WebDAV и запасной конфиг `sd:/config/JKSV/webdav.json`. Образец конфига `contracts/switch-config.example.json` (общий для ПК и Switch, отдельного `switch/config.example.json` нет) и README описывают новый формат.
 
 ## Slice 1.5: Лаунчер — приём сейва (`PUT /save`)
 

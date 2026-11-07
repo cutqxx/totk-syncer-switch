@@ -1,647 +1,401 @@
-#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "config.h"
-#include "fs_compat.h"
-#include "paths.h"
 #include "test.h"
 #include "test_fs.h"
+#include "test_support.h"
 
-#define SECRET "S3cr3t-P@ssw0rd-XYZ"
-#define TOTK_PATH "sd:/config/totk-sync/config.json"
-#define JKSV_PATH "sd:/config/JKSV/webdav.json"
-#define GAME TS_GAME_FOLDER
+#define DISPLAY_PATH "sd:/config/totk-sync/config.json"
+#define GOOD_HOST "\"192.168.1.10\""
+#define GOOD_PORT "8765"
+#define GOOD_TOKEN "\"abcDEF123-_.~token\""
+#define LEGACY_TEXT "Old Phase 0 config: save switch-config.json from the PC launcher"
 
-static const char *VALID_JSON =
-    "{\"origin\":\"https://dav.example.com/remote.php\",\"basepath\":\"saves\","
-    "\"username\":\"alice\",\"password\":\"" SECRET "\"}";
-
-static config_status_t parse_totk(const char *json, config_t *cfg, config_error_t *err)
+/* Each argument is a raw JSON value; NULL leaves the field out. */
+static void build_config(char *out, size_t size, const char *host, const char *port, const char *token, const char *keep)
 {
-    return config_parse(json, CONFIG_SOURCE_TOTK_SYNC, TOTK_PATH, cfg, err);
+    out[0] = '\0';
+    size_t used = 0;
+    used += (size_t)snprintf(out + used, size - used, "{\"unused\": 0");
+    if (host != NULL) used += (size_t)snprintf(out + used, size - used, ",\"pc_host\":%s", host);
+    if (port != NULL) used += (size_t)snprintf(out + used, size - used, ",\"pc_port\":%s", port);
+    if (token != NULL) used += (size_t)snprintf(out + used, size - used, ",\"token\":%s", token);
+    if (keep != NULL) used += (size_t)snprintf(out + used, size - used, ",\"keep_backups\":%s", keep);
+    snprintf(out + used, size - used, "}");
 }
 
-static config_status_t parse_jksv(const char *json, config_t *cfg, config_error_t *err)
+static config_status_t parse_fields(const char *host, const char *port, const char *token, const char *keep,
+                                    config_t *cfg, config_error_t *err)
 {
-    return config_parse(json, CONFIG_SOURCE_JKSV, JKSV_PATH, cfg, err);
-}
-
-static void format_json(char *out, size_t size, const char *origin, const char *basepath, const char *username, const char *password)
-{
-    snprintf(out, size, "{\"origin\":\"%s\",\"basepath\":\"%s\",\"username\":\"%s\",\"password\":\"%s\"}", origin, basepath, username, password);
-}
-
-static void fill(char *out, size_t length)
-{
-    memset(out, 'a', length);
-    out[length] = '\0';
-}
-
-static void parses_totk_sync_config_values_and_source(void)
-{
-    config_t cfg;
-    config_error_t err;
-    CHECK_INT_EQ(parse_totk(VALID_JSON, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.origin, "https://dav.example.com/remote.php");
-    CHECK_STR_EQ(cfg.basepath, "saves");
-    CHECK_STR_EQ(cfg.username, "alice");
-    CHECK_STR_EQ(cfg.password, SECRET);
-    CHECK_INT_EQ(cfg.source, CONFIG_SOURCE_TOTK_SYNC);
-    CHECK_STR_EQ(cfg.source_display_path, TOTK_PATH);
-}
-
-static void accepts_and_ignores_keep_backups_field(void)
-{
-    config_t cfg;
-    config_error_t err;
-    const char *json = "{\"origin\":\"https://h\",\"basepath\":\"b\",\"username\":\"u\",\"password\":\"p\",\"keep_backups\":5}";
-    CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.basepath, "b");
-    CHECK_STR_EQ(cfg.username, "u");
-}
-
-static void totk_sync_basepath_is_not_extended_with_game_folder(void)
-{
-    config_t cfg;
-    config_error_t err;
-    CHECK_INT_EQ(parse_totk(VALID_JSON, &cfg, &err), CONFIG_OK);
-    CHECK_STR_NOT_CONTAINS(cfg.basepath, GAME);
-}
-
-static void jksv_basepath_gets_game_folder_appended(void)
-{
-    config_t cfg;
-    config_error_t err;
-    char json[512];
-    format_json(json, sizeof json, "https://h", "JKSV", "u", "p");
-    CHECK_INT_EQ(parse_jksv(json, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.basepath, "JKSV/" GAME);
-    CHECK_INT_EQ(cfg.source, CONFIG_SOURCE_JKSV);
-    CHECK_STR_EQ(cfg.source_display_path, JKSV_PATH);
-}
-
-static void jksv_trailing_slashes_are_stripped_before_append(void)
-{
-    config_t cfg;
-    config_error_t err;
-    char json[512];
-    format_json(json, sizeof json, "https://h", "JKSV///", "u", "p");
-    CHECK_INT_EQ(parse_jksv(json, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.basepath, "JKSV/" GAME);
-}
-
-static void jksv_empty_basepath_yields_game_folder_only(void)
-{
-    config_t cfg;
-    config_error_t err;
-    char json[512];
-    format_json(json, sizeof json, "https://h", "", "u", "p");
-    CHECK_INT_EQ(parse_jksv(json, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.basepath, GAME);
-}
-
-static void jksv_slash_only_basepath_yields_game_folder_only(void)
-{
-    config_t cfg;
-    config_error_t err;
-    char json[512];
-    format_json(json, sizeof json, "https://h", "/", "u", "p");
-    CHECK_INT_EQ(parse_jksv(json, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.basepath, GAME);
-}
-
-static void jksv_missing_basepath_yields_game_folder_only(void)
-{
-    config_t cfg;
-    config_error_t err;
-    const char *json = "{\"origin\":\"https://h\",\"username\":\"u\",\"password\":\"p\"}";
-    CHECK_INT_EQ(parse_jksv(json, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.basepath, GAME);
-}
-
-static void jksv_non_string_basepath_is_treated_as_missing(void)
-{
-    config_t cfg;
-    config_error_t err;
-    const char *json = "{\"origin\":\"https://h\",\"basepath\":42,\"username\":\"u\",\"password\":\"p\"}";
-    CHECK_INT_EQ(parse_jksv(json, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.basepath, GAME);
-}
-
-static void jksv_basepath_overflowing_after_append_is_too_long(void)
-{
-    config_t cfg;
-    config_error_t err;
-    char base[512];
     char json[1024];
-    fill(base, 500);
-    format_json(json, sizeof json, "https://h", base, "u", SECRET);
-    CHECK_INT_EQ(parse_jksv(json, &cfg, &err), CONFIG_ERR_FIELD_TOO_LONG);
-    CHECK_INT_EQ(err.status, CONFIG_ERR_FIELD_TOO_LONG);
-    CHECK(strstr(err.message, "basepath") != NULL);
-    CHECK(strstr(err.message, JKSV_PATH) != NULL);
-    CHECK_STR_NOT_CONTAINS(err.message, SECRET);
+    build_config(json, sizeof json, host, port, token, keep);
+    return config_parse(json, DISPLAY_PATH, cfg, err);
 }
 
-static void totk_sync_basepath_of_max_length_is_accepted(void)
+static void accepts_the_contract_example_file_as_is(void)
 {
+    char *json = test_read_file_in(CONTRACTS_DIR, "switch-config.example.json");
     config_t cfg;
     config_error_t err;
-    char base[512];
-    char json[1024];
-    fill(base, 511);
-    format_json(json, sizeof json, "https://h", base, "u", "p");
-    CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.basepath, base);
+    CHECK(json != NULL);
+    CHECK_INT_EQ(config_parse(json, DISPLAY_PATH, &cfg, &err), CONFIG_OK);
+    CHECK_STR_EQ(cfg.pc_host, "192.168.1.10");
+    CHECK_INT_EQ(cfg.pc_port, 8765);
+    CHECK_STR_EQ(cfg.token, CONTRACT_TOKEN);
+    CHECK_INT_EQ(cfg.keep_backups, 20);
+    CHECK_STR_EQ(cfg.source_display_path, DISPLAY_PATH);
+    free(json);
 }
 
-static void missing_required_field_names_field_and_path(void)
+static void accepts_the_contract_example_with_crlf_line_endings(void)
 {
-    static const char *const names[] = { "origin", "basepath", "username", "password" };
-    for (int skip = 0; skip < 4; skip++) {
-        char json[512] = "{";
-        for (int i = 0; i < 4; i++) {
-            if (i == skip) {
-                continue;
-            }
-            char entry[160];
-            snprintf(entry, sizeof entry, "%s\"%s\":\"%s\"", strlen(json) > 1 ? "," : "", names[i], i == 0 ? "https://h" : i == 3 ? SECRET : "x");
-            strcat(json, entry);
-        }
-        strcat(json, "}");
+    char *json = test_read_file_in(CONTRACTS_DIR, "switch-config.example.json");
+    char crlf[1024];
+    size_t used = 0;
+    config_t cfg;
+    config_error_t err;
+    CHECK(json != NULL);
+    for (const char *p = json; *p != '\0' && used + 2 < sizeof crlf; p++) {
+        if (*p == '\n') crlf[used++] = '\r';
+        crlf[used++] = *p;
+    }
+    crlf[used] = '\0';
+    CHECK(strstr(crlf, "\r\n") != NULL);
+    CHECK_INT_EQ(config_parse(crlf, DISPLAY_PATH, &cfg, &err), CONFIG_OK);
+    CHECK_STR_EQ(cfg.token, CONTRACT_TOKEN);
+    free(json);
+}
+
+static void accepts_the_contract_example_with_utf8_bom(void)
+{
+    char *json = test_read_file_in(CONTRACTS_DIR, "switch-config.example.json");
+    char with_bom[1024] = "\xEF\xBB\xBF";
+    config_t cfg;
+    config_error_t err;
+    CHECK(json != NULL);
+    strncat(with_bom, json, sizeof with_bom - 4);
+    CHECK_INT_EQ(config_parse(with_bom, DISPLAY_PATH, &cfg, &err), CONFIG_OK);
+    CHECK_STR_EQ(cfg.pc_host, "192.168.1.10");
+    free(json);
+}
+
+static void reports_each_missing_required_field_by_name_and_path(void)
+{
+    static const char *const names[] = { "pc_host", "pc_port", "token" };
+    for (int missing = 0; missing < 3; missing++) {
         config_t cfg;
         config_error_t err;
-        CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_ERR_FIELD);
-        char quoted[32];
-        snprintf(quoted, sizeof quoted, "\"%s\"", names[skip]);
-        CHECK(strstr(err.message, quoted) != NULL);
-        CHECK(strstr(err.message, TOTK_PATH) != NULL);
-        CHECK_STR_NOT_CONTAINS(err.message, SECRET);
+        config_status_t status = parse_fields(missing == 0 ? NULL : GOOD_HOST, missing == 1 ? NULL : GOOD_PORT,
+                                              missing == 2 ? NULL : GOOD_TOKEN, NULL, &cfg, &err);
+        CHECK_INT_EQ(status, CONFIG_ERR_FIELD);
+        CHECK_INT_EQ(err.status, CONFIG_ERR_FIELD);
+        CHECK(strstr(err.message, names[missing]) != NULL);
+        CHECK(strstr(err.message, DISPLAY_PATH) != NULL);
     }
 }
 
-static void empty_or_non_string_required_field_is_a_field_error(void)
+static void reports_empty_and_blank_text_fields_by_name_and_path(void)
 {
-    static const char *const names[] = { "origin", "basepath", "username", "password" };
-    static const char *const bad_values[] = { "\"\"", "123", "null", "true", "[\"x\"]", "{}" };
-    for (int field = 0; field < 4; field++) {
-        for (size_t v = 0; v < sizeof bad_values / sizeof bad_values[0]; v++) {
-            char json[512];
-            snprintf(json, sizeof json, "{\"origin\":%s,\"basepath\":%s,\"username\":%s,\"password\":%s}",
-                field == 0 ? bad_values[v] : "\"https://h\"",
-                field == 1 ? bad_values[v] : "\"b\"",
-                field == 2 ? bad_values[v] : "\"u\"",
-                field == 3 ? bad_values[v] : "\"" SECRET "\"");
-            config_t cfg;
-            config_error_t err;
-            CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_ERR_FIELD);
-            char quoted[32];
-            snprintf(quoted, sizeof quoted, "\"%s\"", names[field]);
-            CHECK(strstr(err.message, quoted) != NULL);
-            CHECK(strstr(err.message, TOTK_PATH) != NULL);
-            CHECK_STR_NOT_CONTAINS(err.message, SECRET);
-        }
+    static const char *const empties[] = { "\"\"", "\"   \"", "\"\\t\\r\\n\"", "null", "5" };
+    for (size_t i = 0; i < sizeof empties / sizeof empties[0]; i++) {
+        config_t cfg;
+        config_error_t err;
+        CHECK_INT_EQ(parse_fields(empties[i], GOOD_PORT, GOOD_TOKEN, NULL, &cfg, &err), CONFIG_ERR_FIELD);
+        CHECK(strstr(err.message, "pc_host") != NULL);
+        CHECK(strstr(err.message, DISPLAY_PATH) != NULL);
+        CHECK_INT_EQ(parse_fields(GOOD_HOST, GOOD_PORT, empties[i], NULL, &cfg, &err), CONFIG_ERR_FIELD);
+        CHECK(strstr(err.message, "token") != NULL);
+        CHECK(strstr(err.message, DISPLAY_PATH) != NULL);
     }
 }
 
-static void jksv_missing_origin_is_a_field_error_naming_jksv_path(void)
+static void rejects_a_token_with_a_space_or_control_or_non_ascii_character(void)
 {
-    config_t cfg;
-    config_error_t err;
-    const char *json = "{\"basepath\":\"b\",\"username\":\"u\",\"password\":\"" SECRET "\"}";
-    CHECK_INT_EQ(parse_jksv(json, &cfg, &err), CONFIG_ERR_FIELD);
-    CHECK(strstr(err.message, "\"origin\"") != NULL);
-    CHECK(strstr(err.message, JKSV_PATH) != NULL);
-    CHECK_STR_NOT_CONTAINS(err.message, SECRET);
-}
-
-static void non_object_json_reports_missing_fields(void)
-{
-    config_t cfg;
-    config_error_t err;
-    CHECK_INT_EQ(parse_totk("[1,2,3]", &cfg, &err), CONFIG_ERR_FIELD);
-    CHECK_INT_EQ(parse_totk("\"text\"", &cfg, &err), CONFIG_ERR_FIELD);
-}
-
-static void too_long_value_reports_field_name_and_limit(void)
-{
-    static const struct {
-        const char *name;
-        size_t max;
-    } limits[] = {
-        { "origin", 255 }, { "basepath", 511 }, { "username", 127 }, { "password", 127 },
+    static const char *const bad[] = {
+        "\"abc def\"", "\"abc\\u0001def\"", "\"abc\\tdef\"", "\"abc\\u007fdef\"", "\"abc\\u00e9def\"",
+        "\"\\u0442\\u043e\\u043a\\u0435\\u043d\"",
     };
-    for (int field = 0; field < 4; field++) {
-        char big[600];
-        char json[2048];
-        fill(big, limits[field].max + 1);
-        if (field == 0) {
-            memcpy(big, "https://", 8);
-        }
-        format_json(json, sizeof json, field == 0 ? big : "https://h",
-            field == 1 ? big : "b", field == 2 ? big : "u", field == 3 ? big : SECRET);
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
         config_t cfg;
         config_error_t err;
-        CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_ERR_FIELD_TOO_LONG);
-        char quoted[32];
-        snprintf(quoted, sizeof quoted, "\"%s\"", limits[field].name);
-        CHECK(strstr(err.message, quoted) != NULL);
-        CHECK(strstr(err.message, TOTK_PATH) != NULL);
-        CHECK_STR_NOT_CONTAINS(err.message, SECRET);
-        char maximum[16];
-        snprintf(maximum, sizeof maximum, "%zu", limits[field].max);
-        CHECK(strstr(err.message, maximum) != NULL);
+        CHECK_INT_EQ(parse_fields(GOOD_HOST, GOOD_PORT, bad[i], NULL, &cfg, &err), CONFIG_ERR_INVALID_VALUE);
+        CHECK(strstr(err.message, "token") != NULL);
+        CHECK(strstr(err.message, DISPLAY_PATH) != NULL);
     }
 }
 
-static void value_at_exact_maximum_length_is_accepted(void)
+static void error_for_a_bad_token_never_contains_the_token(void)
 {
     config_t cfg;
     config_error_t err;
-    char user[200];
-    char json[512];
-    fill(user, 127);
-    format_json(json, sizeof json, "https://h", "b", user, "p");
-    CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.username, user);
+    parse_fields(GOOD_HOST, GOOD_PORT, "\"secret value\"", NULL, &cfg, &err);
+    CHECK_STR_NOT_CONTAINS(err.message, "secret");
 }
 
-static void non_https_origins_are_rejected_as_insecure(void)
+static void make_quoted_token(char *out, size_t length)
 {
-    static const char *const origins[] = {
-        "http://dav.example.com", "ftp://dav.example.com", "HTTPS://dav.example.com",
-        "Https://dav.example.com", "dav.example.com", " https://dav.example.com",
-        "https:/dav.example.com", "http", "httpss://x", "ws://x",
+    out[0] = '"';
+    memset(out + 1, 'x', length);
+    out[length + 1] = '"';
+    out[length + 2] = '\0';
+}
+
+static void token_length_limit_is_127_characters(void)
+{
+    char token127[130];
+    char token128[131];
+    char token500[505];
+    config_t cfg;
+    config_error_t err;
+    make_quoted_token(token127, 127);
+    make_quoted_token(token128, 128);
+    make_quoted_token(token500, 500);
+
+    CHECK_INT_EQ(parse_fields(GOOD_HOST, GOOD_PORT, token127, NULL, &cfg, &err), CONFIG_OK);
+    CHECK_INT_EQ((long long)strlen(cfg.token), 127);
+    CHECK_INT_EQ(parse_fields(GOOD_HOST, GOOD_PORT, token128, NULL, &cfg, &err), CONFIG_ERR_FIELD_TOO_LONG);
+    CHECK(strstr(err.message, "token") != NULL);
+    CHECK(strstr(err.message, DISPLAY_PATH) != NULL);
+    CHECK(strstr(err.message, "127") != NULL);
+    CHECK_INT_EQ(parse_fields(GOOD_HOST, GOOD_PORT, token500, NULL, &cfg, &err), CONFIG_ERR_FIELD_TOO_LONG);
+}
+
+static void port_boundaries_are_1024_to_65535(void)
+{
+    config_t cfg;
+    config_error_t err;
+    CHECK_INT_EQ(parse_fields(GOOD_HOST, "1023", GOOD_TOKEN, NULL, &cfg, &err), CONFIG_ERR_INVALID_VALUE);
+    CHECK(strstr(err.message, "pc_port") != NULL);
+    CHECK(strstr(err.message, DISPLAY_PATH) != NULL);
+    CHECK_INT_EQ(parse_fields(GOOD_HOST, "1024", GOOD_TOKEN, NULL, &cfg, &err), CONFIG_OK);
+    CHECK_INT_EQ(cfg.pc_port, 1024);
+    CHECK_INT_EQ(parse_fields(GOOD_HOST, "65535", GOOD_TOKEN, NULL, &cfg, &err), CONFIG_OK);
+    CHECK_INT_EQ(cfg.pc_port, 65535);
+    CHECK_INT_EQ(parse_fields(GOOD_HOST, "65536", GOOD_TOKEN, NULL, &cfg, &err), CONFIG_ERR_INVALID_VALUE);
+}
+
+static void rejects_ports_that_are_not_whole_numbers(void)
+{
+    static const char *const bad[] = { "\"8765\"", "8765.5", "-8765", "0", "true", "null", "[8765]", "\"\"", "1e9" };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+        config_t cfg;
+        config_error_t err;
+        CHECK_INT_EQ(parse_fields(GOOD_HOST, bad[i], GOOD_TOKEN, NULL, &cfg, &err), CONFIG_ERR_INVALID_VALUE);
+        CHECK(strstr(err.message, "pc_port") != NULL);
+    }
+}
+
+static void keep_backups_defaults_to_20_when_absent(void)
+{
+    config_t cfg;
+    config_error_t err;
+    CHECK_INT_EQ(parse_fields(GOOD_HOST, GOOD_PORT, GOOD_TOKEN, NULL, &cfg, &err), CONFIG_OK);
+    CHECK_INT_EQ(cfg.keep_backups, 20);
+}
+
+static void keep_backups_accepts_one_and_larger_whole_numbers(void)
+{
+    config_t cfg;
+    config_error_t err;
+    CHECK_INT_EQ(parse_fields(GOOD_HOST, GOOD_PORT, GOOD_TOKEN, "1", &cfg, &err), CONFIG_OK);
+    CHECK_INT_EQ(cfg.keep_backups, 1);
+    CHECK_INT_EQ(parse_fields(GOOD_HOST, GOOD_PORT, GOOD_TOKEN, "50", &cfg, &err), CONFIG_OK);
+    CHECK_INT_EQ(cfg.keep_backups, 50);
+}
+
+static void keep_backups_rejects_zero_negative_fractional_and_non_numbers(void)
+{
+    static const char *const bad[] = { "0", "-1", "1.5", "\"5\"", "null", "true", "99999999999" };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+        config_t cfg;
+        config_error_t err;
+        CHECK_INT_EQ(parse_fields(GOOD_HOST, GOOD_PORT, GOOD_TOKEN, bad[i], &cfg, &err), CONFIG_ERR_INVALID_VALUE);
+        CHECK(strstr(err.message, "keep_backups") != NULL);
+        CHECK(strstr(err.message, DISPLAY_PATH) != NULL);
+    }
+}
+
+static void rejects_public_loopback_link_local_and_named_hosts(void)
+{
+    static const char *const bad[] = {
+        "\"8.8.8.8\"", "\"127.0.0.1\"", "\"169.254.1.1\"", "\"172.32.0.1\"", "\"example.com\"",
+        "\"192.168.001.10\"", "\"192.168.1.10 \"", "\"192.168.1.10:8765\"", "\"http://192.168.1.10\"",
     };
-    for (size_t i = 0; i < sizeof origins / sizeof origins[0]; i++) {
-        char json[512];
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
         config_t cfg;
         config_error_t err;
-        format_json(json, sizeof json, origins[i], "b", "u", SECRET);
-        CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_ERR_INSECURE_ORIGIN);
-        CHECK_INT_EQ(err.status, CONFIG_ERR_INSECURE_ORIGIN);
-        CHECK(strstr(err.message, TOTK_PATH) != NULL);
-        CHECK_STR_NOT_CONTAINS(err.message, SECRET);
-        CHECK_INT_EQ(parse_jksv(json, &cfg, &err), CONFIG_ERR_INSECURE_ORIGIN);
+        CHECK_INT_EQ(parse_fields(bad[i], GOOD_PORT, GOOD_TOKEN, NULL, &cfg, &err), CONFIG_ERR_NOT_PRIVATE_IPV4);
+        CHECK(strstr(err.message, "pc_host") != NULL);
+        CHECK(strstr(err.message, DISPLAY_PATH) != NULL);
     }
 }
 
-static void https_origin_is_accepted(void)
+static void accepts_private_hosts_including_the_longest_one(void)
 {
-    config_t cfg;
-    config_error_t err;
-    char json[512];
-    format_json(json, sizeof json, "https://x", "b", "u", "p");
-    CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_OK);
+    static const char *const good[] = { "10.0.0.1", "172.16.0.1", "172.31.255.255", "192.168.100.100", "192.168.255.255" };
+    for (size_t i = 0; i < sizeof good / sizeof good[0]; i++) {
+        char quoted[32];
+        config_t cfg;
+        config_error_t err;
+        snprintf(quoted, sizeof quoted, "\"%s\"", good[i]);
+        CHECK_INT_EQ(parse_fields(quoted, GOOD_PORT, GOOD_TOKEN, NULL, &cfg, &err), CONFIG_OK);
+        CHECK_STR_EQ(cfg.pc_host, good[i]);
+    }
 }
 
-static void broken_json_reports_line_and_column(void)
+static void phase0_yandex_config_gets_the_exact_legacy_message(void)
 {
+    const char *json = "{\"origin\":\"https://webdav.example\",\"username\":\"u\",\"password\":\"p\",\"basepath\":\"/x\"}";
     config_t cfg;
     config_error_t err;
-    const char *json = "{\n  \"origin\": \"https://h\",\n  \"basepath\": ?\n}";
-    CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_ERR_PARSE);
-    CHECK_INT_EQ(err.status, CONFIG_ERR_PARSE);
-    CHECK(strncmp(err.message, "Parse error in " TOTK_PATH, strlen("Parse error in " TOTK_PATH)) == 0);
-    CHECK(strstr(err.message, "line 3, column 15") != NULL);
+    CHECK_INT_EQ(config_parse(json, DISPLAY_PATH, &cfg, &err), CONFIG_ERR_LEGACY_PHASE0);
+    CHECK_INT_EQ(err.status, CONFIG_ERR_LEGACY_PHASE0);
+    CHECK_STR_EQ(err.message, LEGACY_TEXT);
 }
 
-static void broken_json_on_first_line_reports_line_one(void)
+static void a_single_phase0_field_is_enough_to_report_legacy(void)
 {
     config_t cfg;
     config_error_t err;
-    CHECK_INT_EQ(parse_jksv("{\"a\" 1}", &cfg, &err), CONFIG_ERR_PARSE);
-    CHECK(strstr(err.message, "Parse error in " JKSV_PATH) == err.message);
-    CHECK(strstr(err.message, "line 1, column 6") != NULL);
+    CHECK_INT_EQ(config_parse("{\"origin\":\"x\"}", DISPLAY_PATH, &cfg, &err), CONFIG_ERR_LEGACY_PHASE0);
+    CHECK_STR_EQ(err.message, LEGACY_TEXT);
+    CHECK_INT_EQ(config_parse("{\"password\":\"x\"}", DISPLAY_PATH, &cfg, &err), CONFIG_ERR_LEGACY_PHASE0);
 }
 
-static void empty_input_is_a_parse_error_and_does_not_crash(void)
+static void legacy_message_does_not_leak_phase0_password(void)
 {
     config_t cfg;
     config_error_t err;
-    CHECK_INT_EQ(parse_totk("", &cfg, &err), CONFIG_ERR_PARSE);
-    CHECK(strstr(err.message, "Parse error in " TOTK_PATH) == err.message);
+    config_parse("{\"origin\":\"o\",\"username\":\"u\",\"password\":\"HunterTwo\"}", DISPLAY_PATH, &cfg, &err);
+    CHECK_STR_NOT_CONTAINS(err.message, "HunterTwo");
 }
 
-static void trailing_comma_object_is_rejected_without_leaking_password(void)
+static void new_fields_next_to_leftover_phase0_fields_are_a_normal_config(void)
 {
+    const char *json = "{\"origin\":\"x\",\"pc_host\":\"10.0.0.2\",\"pc_port\":8765,\"token\":\"tok\"}";
     config_t cfg;
     config_error_t err;
-    char json[512];
-    snprintf(json, sizeof json, "{\"origin\":\"https://h\",\"basepath\":\"b\",\"username\":\"u\",\"password\":\"%s\",}", SECRET);
-    CHECK(parse_totk(json, &cfg, &err) != CONFIG_OK);
-    CHECK_STR_NOT_CONTAINS(err.message, SECRET);
+    CHECK_INT_EQ(config_parse(json, DISPLAY_PATH, &cfg, &err), CONFIG_OK);
 }
 
-static void parse_error_message_never_contains_password(void)
+static void an_empty_object_is_a_missing_field_not_legacy(void)
 {
     config_t cfg;
     config_error_t err;
-    char json[512];
-    snprintf(json, sizeof json, "{\"password\":\"%s\" \"origin\"", SECRET);
-    CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_ERR_PARSE);
-    CHECK_STR_NOT_CONTAINS(err.message, SECRET);
+    CHECK_INT_EQ(config_parse("{}", DISPLAY_PATH, &cfg, &err), CONFIG_ERR_FIELD);
+    CHECK(strstr(err.message, "pc_host") != NULL);
 }
 
-static void decodes_json_escapes_to_exact_bytes(void)
+static void broken_json_reports_parse_error_with_path_and_position(void)
 {
     config_t cfg;
     config_error_t err;
-    const char *json = "{\"origin\":\"https:\\/\\/h\",\"basepath\":\"a\\\\b\","
-                       "\"username\":\"q\\\"r\",\"password\":\"\\u043a\\u043e\\u0442\"}";
-    CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.origin, "https://h");
-    CHECK_STR_EQ(cfg.basepath, "a\\b");
-    CHECK_STR_EQ(cfg.username, "q\"r");
-    CHECK_STR_EQ(cfg.password, "\xD0\xBA\xD0\xBE\xD1\x82");
+    CHECK_INT_EQ(config_parse("{\n  \"pc_host\": ,\n}", DISPLAY_PATH, &cfg, &err), CONFIG_ERR_PARSE);
+    CHECK(strstr(err.message, DISPLAY_PATH) != NULL);
+    CHECK(strstr(err.message, "line 2") != NULL);
 }
 
-static void decodes_surrogate_pair_to_four_byte_utf8(void)
+static void empty_or_non_object_json_is_rejected_without_crashing(void)
 {
     config_t cfg;
     config_error_t err;
-    const char *json = "{\"origin\":\"https://h\",\"basepath\":\"b\",\"username\":\"\\ud83d\\ude00\",\"password\":\"p\"}";
-    CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_OK);
-    CHECK_INT_EQ(strlen(cfg.username), 4);
-    CHECK(memcmp(cfg.username, "\xF0\x9F\x98\x80", 5) == 0);
+    CHECK_INT_EQ(config_parse("", DISPLAY_PATH, &cfg, &err), CONFIG_ERR_PARSE);
+    CHECK_INT_EQ(config_parse("{\"pc_host\":", DISPLAY_PATH, &cfg, &err), CONFIG_ERR_PARSE);
+    CHECK_INT_EQ(config_parse("[]", DISPLAY_PATH, &cfg, &err), CONFIG_ERR_FIELD);
+    CHECK_INT_EQ(config_parse("\"text\"", DISPLAY_PATH, &cfg, &err), CONFIG_ERR_FIELD);
+    CHECK_INT_EQ(config_parse("null", DISPLAY_PATH, &cfg, &err), CONFIG_ERR_FIELD);
 }
 
-static void raw_utf8_text_is_preserved_byte_exact(void)
+static void successful_parse_clears_the_error(void)
 {
     config_t cfg;
     config_error_t err;
-    const char *json = "{\"origin\":\"https://h\",\"basepath\":\"b\",\"username\":\"\xD0\xBA\xD0\xBE\xD1\x82\",\"password\":\"p\"}";
-    CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.username, "\xD0\xBA\xD0\xBE\xD1\x82");
-}
-
-static void utf8_bom_at_start_is_accepted(void)
-{
-    config_t cfg;
-    config_error_t err;
-    char json[512];
-    snprintf(json, sizeof json, "\xEF\xBB\xBF%s", VALID_JSON);
-    CHECK_INT_EQ(parse_totk(json, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.username, "alice");
-}
-
-static void parse_error_position_ignores_bom(void)
-{
-    config_t cfg;
-    config_error_t err;
-    CHECK_INT_EQ(parse_totk("\xEF\xBB\xBF{\"a\" 1}", &cfg, &err), CONFIG_ERR_PARSE);
-    CHECK(strstr(err.message, "line 1, column 6") != NULL);
-}
-
-static void successful_parse_clears_previous_error(void)
-{
-    config_t cfg;
-    config_error_t err;
-    parse_totk("{", &cfg, &err);
-    CHECK_INT_EQ(parse_totk(VALID_JSON, &cfg, &err), CONFIG_OK);
+    snprintf(err.message, sizeof err.message, "stale");
+    err.status = CONFIG_ERR_PARSE;
+    CHECK_INT_EQ(parse_fields(GOOD_HOST, GOOD_PORT, GOOD_TOKEN, NULL, &cfg, &err), CONFIG_OK);
     CHECK_INT_EQ(err.status, CONFIG_OK);
     CHECK_STR_EQ(err.message, "");
 }
 
-/* ---- config_load: file selection ---- */
-
-static const char *TOTK_JSON =
-    "{\"origin\":\"https://totk.example\",\"basepath\":\"fromtotk\",\"username\":\"tu\",\"password\":\"" SECRET "\"}";
-static const char *JKSV_JSON =
-    "{\"origin\":\"https://jksv.example\",\"basepath\":\"JKSV\",\"username\":\"ju\",\"password\":\"jp\"}";
-
-static bool make_root(char *root, size_t size)
-{
-    bool ok = test_fs_make_root(root, size);
-    CHECK(ok);
-    return ok;
-}
-
-static void write_config(const char *root, const char *rel, const char *content)
-{
-    CHECK(test_fs_write_file(root, rel, content, strlen(content)));
-}
-
-static void load_uses_totk_sync_config_when_only_it_exists(void)
+static void load_reports_missing_file_with_display_path(void)
 {
     char root[256];
     config_t cfg;
     config_error_t err;
-    if (!make_root(root, sizeof root)) return;
-    write_config(root, TS_REL_CONFIG, TOTK_JSON);
-    CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.origin, "https://totk.example");
-    CHECK_STR_EQ(cfg.basepath, "fromtotk");
-    CHECK_INT_EQ(cfg.source, CONFIG_SOURCE_TOTK_SYNC);
-    CHECK_STR_EQ(cfg.source_display_path, TOTK_PATH);
-}
-
-static void load_falls_back_to_jksv_config_when_totk_sync_missing(void)
-{
-    char root[256];
-    config_t cfg;
-    config_error_t err;
-    if (!make_root(root, sizeof root)) return;
-    write_config(root, TS_REL_JKSV_CONFIG, JKSV_JSON);
-    CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.origin, "https://jksv.example");
-    CHECK_STR_EQ(cfg.basepath, "JKSV/" GAME);
-    CHECK_STR_EQ(cfg.username, "ju");
-    CHECK_INT_EQ(cfg.source, CONFIG_SOURCE_JKSV);
-    CHECK_STR_EQ(cfg.source_display_path, JKSV_PATH);
-}
-
-static void load_prefers_totk_sync_when_both_exist(void)
-{
-    char root[256];
-    config_t cfg;
-    config_error_t err;
-    if (!make_root(root, sizeof root)) return;
-    write_config(root, TS_REL_CONFIG, TOTK_JSON);
-    write_config(root, TS_REL_JKSV_CONFIG, JKSV_JSON);
-    CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.origin, "https://totk.example");
-    CHECK_INT_EQ(cfg.source, CONFIG_SOURCE_TOTK_SYNC);
-}
-
-static void load_does_not_fall_back_when_totk_sync_config_is_broken(void)
-{
-    char root[256];
-    config_t cfg;
-    config_error_t err;
-    if (!make_root(root, sizeof root)) return;
-    write_config(root, TS_REL_CONFIG, "{\n  broken");
-    write_config(root, TS_REL_JKSV_CONFIG, JKSV_JSON);
-    CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_ERR_PARSE);
-    CHECK(strstr(err.message, TOTK_PATH) != NULL);
-    CHECK_STR_NOT_CONTAINS(err.message, JKSV_PATH);
-}
-
-static void load_does_not_fall_back_when_totk_sync_config_has_field_error(void)
-{
-    char root[256];
-    config_t cfg;
-    config_error_t err;
-    if (!make_root(root, sizeof root)) return;
-    write_config(root, TS_REL_CONFIG, "{\"origin\":\"https://h\"}");
-    write_config(root, TS_REL_JKSV_CONFIG, JKSV_JSON);
-    CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_ERR_FIELD);
-    CHECK(strstr(err.message, TOTK_PATH) != NULL);
-}
-
-static void load_does_not_fall_back_when_totk_sync_origin_is_insecure(void)
-{
-    char root[256];
-    config_t cfg;
-    config_error_t err;
-    char json[512];
-    if (!make_root(root, sizeof root)) return;
-    format_json(json, sizeof json, "http://h", "b", "u", SECRET);
-    write_config(root, TS_REL_CONFIG, json);
-    write_config(root, TS_REL_JKSV_CONFIG, JKSV_JSON);
-    CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_ERR_INSECURE_ORIGIN);
-    CHECK_STR_NOT_CONTAINS(err.message, SECRET);
-}
-
-static void load_reports_jksv_errors_with_jksv_path(void)
-{
-    char root[256];
-    config_t cfg;
-    config_error_t err;
-    if (!make_root(root, sizeof root)) return;
-    write_config(root, TS_REL_JKSV_CONFIG, "{\"origin\":\"http://h\",\"username\":\"u\",\"password\":\"" SECRET "\"}");
-    CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_ERR_INSECURE_ORIGIN);
-    CHECK(strstr(err.message, JKSV_PATH) != NULL);
-    CHECK_STR_NOT_CONTAINS(err.message, SECRET);
-}
-
-static void load_reports_not_found_naming_both_paths_when_neither_exists(void)
-{
-    char root[256];
-    config_t cfg;
-    config_error_t err;
-    if (!make_root(root, sizeof root)) return;
+    CHECK(test_fs_make_root(root, sizeof root));
     CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_ERR_NOT_FOUND);
-    CHECK_INT_EQ(err.status, CONFIG_ERR_NOT_FOUND);
-    CHECK(strstr(err.message, TOTK_PATH) != NULL);
-    CHECK(strstr(err.message, JKSV_PATH) != NULL);
+    CHECK(strstr(err.message, DISPLAY_PATH) != NULL);
+    CHECK_STR_NOT_CONTAINS(err.message, "build/tmp");
 }
 
-static void load_accepts_config_file_with_bom(void)
+static void load_reads_the_config_from_the_sd_config_directory(void)
 {
     char root[256];
+    char *json = test_read_file_in(CONTRACTS_DIR, "switch-config.example.json");
     config_t cfg;
     config_error_t err;
-    char json[512];
-    if (!make_root(root, sizeof root)) return;
-    snprintf(json, sizeof json, "\xEF\xBB\xBF%s", TOTK_JSON);
-    write_config(root, TS_REL_CONFIG, json);
+    CHECK(json != NULL);
+    CHECK(test_fs_make_root(root, sizeof root));
+    CHECK(test_fs_write_file(root, "config/totk-sync/config.json", json, strlen(json)));
     CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_OK);
-    CHECK_STR_EQ(cfg.username, "tu");
+    CHECK_STR_EQ(cfg.pc_host, "192.168.1.10");
+    CHECK_INT_EQ(cfg.pc_port, 8765);
+    CHECK_STR_EQ(cfg.source_display_path, DISPLAY_PATH);
+    free(json);
 }
 
-static void load_treats_empty_file_as_parse_error_without_fallback(void)
+static void load_does_not_fall_back_to_the_phase0_jksv_config(void)
 {
     char root[256];
+    const char *legacy = "{\"origin\":\"x\",\"username\":\"u\",\"password\":\"p\"}";
     config_t cfg;
     config_error_t err;
-    if (!make_root(root, sizeof root)) return;
-    write_config(root, TS_REL_CONFIG, "");
-    write_config(root, TS_REL_JKSV_CONFIG, JKSV_JSON);
+    CHECK(test_fs_make_root(root, sizeof root));
+    CHECK(test_fs_write_file(root, "config/JKSV/webdav.json", legacy, strlen(legacy)));
+    CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_ERR_NOT_FOUND);
+}
+
+static void load_reports_parse_errors_with_the_display_path(void)
+{
+    char root[256];
+    const char *broken = "{ nope";
+    config_t cfg;
+    config_error_t err;
+    CHECK(test_fs_make_root(root, sizeof root));
+    CHECK(test_fs_write_file(root, "config/totk-sync/config.json", broken, strlen(broken)));
     CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_ERR_PARSE);
-    CHECK(strstr(err.message, TOTK_PATH) != NULL);
-}
-
-/* Unreadable config is simulated by making config.json a directory: on Windows/MinGW fopen(dir, "rb")
-   fails with EACCES (not ENOENT), the same "exists but cannot be read" class as an SD read error. */
-static bool make_config_unreadable(const char *root, const char *rel)
-{
-    char path[512];
-    char marker[256];
-    snprintf(marker, sizeof marker, "%s.keep", rel);
-    write_config(root, marker, "x");
-    snprintf(path, sizeof path, "%s/%s", root, rel);
-    return ts_mkdir(path) == 0;
-}
-
-static void load_reports_read_error_when_totk_sync_config_is_unreadable(void)
-{
-    char root[256];
-    config_t cfg;
-    config_error_t err;
-    if (!make_root(root, sizeof root)) return;
-    CHECK(make_config_unreadable(root, TS_REL_CONFIG));
-    CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_ERR_READ);
-    CHECK(strstr(err.message, TOTK_PATH) != NULL);
-}
-
-static void load_does_not_fall_back_to_jksv_when_totk_sync_config_is_unreadable(void)
-{
-    char root[256];
-    config_t cfg;
-    config_error_t err;
-    if (!make_root(root, sizeof root)) return;
-    CHECK(make_config_unreadable(root, TS_REL_CONFIG));
-    write_config(root, TS_REL_JKSV_CONFIG, JKSV_JSON);
-    CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_ERR_READ);
-    CHECK_STR_NOT_CONTAINS(err.message, JKSV_PATH);
-}
-
-static void load_reports_read_error_naming_jksv_path_when_only_jksv_config_is_unreadable(void)
-{
-    char root[256];
-    config_t cfg;
-    config_error_t err;
-    if (!make_root(root, sizeof root)) return;
-    CHECK(make_config_unreadable(root, TS_REL_JKSV_CONFIG));
-    CHECK_INT_EQ(config_load(root, &cfg, &err), CONFIG_ERR_READ);
-    CHECK(strstr(err.message, JKSV_PATH) != NULL);
+    CHECK(strstr(err.message, DISPLAY_PATH) != NULL);
 }
 
 void run_config_tests(void)
 {
-    RUN_TEST(parses_totk_sync_config_values_and_source);
-    RUN_TEST(accepts_and_ignores_keep_backups_field);
-    RUN_TEST(totk_sync_basepath_is_not_extended_with_game_folder);
-    RUN_TEST(jksv_basepath_gets_game_folder_appended);
-    RUN_TEST(jksv_trailing_slashes_are_stripped_before_append);
-    RUN_TEST(jksv_empty_basepath_yields_game_folder_only);
-    RUN_TEST(jksv_slash_only_basepath_yields_game_folder_only);
-    RUN_TEST(jksv_missing_basepath_yields_game_folder_only);
-    RUN_TEST(jksv_non_string_basepath_is_treated_as_missing);
-    RUN_TEST(jksv_basepath_overflowing_after_append_is_too_long);
-    RUN_TEST(totk_sync_basepath_of_max_length_is_accepted);
-    RUN_TEST(missing_required_field_names_field_and_path);
-    RUN_TEST(empty_or_non_string_required_field_is_a_field_error);
-    RUN_TEST(jksv_missing_origin_is_a_field_error_naming_jksv_path);
-    RUN_TEST(non_object_json_reports_missing_fields);
-    RUN_TEST(too_long_value_reports_field_name_and_limit);
-    RUN_TEST(value_at_exact_maximum_length_is_accepted);
-    RUN_TEST(non_https_origins_are_rejected_as_insecure);
-    RUN_TEST(https_origin_is_accepted);
-    RUN_TEST(broken_json_reports_line_and_column);
-    RUN_TEST(broken_json_on_first_line_reports_line_one);
-    RUN_TEST(empty_input_is_a_parse_error_and_does_not_crash);
-    RUN_TEST(trailing_comma_object_is_rejected_without_leaking_password);
-    RUN_TEST(parse_error_message_never_contains_password);
-    RUN_TEST(decodes_json_escapes_to_exact_bytes);
-    RUN_TEST(decodes_surrogate_pair_to_four_byte_utf8);
-    RUN_TEST(raw_utf8_text_is_preserved_byte_exact);
-    RUN_TEST(utf8_bom_at_start_is_accepted);
-    RUN_TEST(parse_error_position_ignores_bom);
-    RUN_TEST(successful_parse_clears_previous_error);
-    RUN_TEST(load_uses_totk_sync_config_when_only_it_exists);
-    RUN_TEST(load_falls_back_to_jksv_config_when_totk_sync_missing);
-    RUN_TEST(load_prefers_totk_sync_when_both_exist);
-    RUN_TEST(load_does_not_fall_back_when_totk_sync_config_is_broken);
-    RUN_TEST(load_does_not_fall_back_when_totk_sync_config_has_field_error);
-    RUN_TEST(load_does_not_fall_back_when_totk_sync_origin_is_insecure);
-    RUN_TEST(load_reports_jksv_errors_with_jksv_path);
-    RUN_TEST(load_reports_not_found_naming_both_paths_when_neither_exists);
-    RUN_TEST(load_accepts_config_file_with_bom);
-    RUN_TEST(load_treats_empty_file_as_parse_error_without_fallback);
-    RUN_TEST(load_reports_read_error_when_totk_sync_config_is_unreadable);
-    RUN_TEST(load_does_not_fall_back_to_jksv_when_totk_sync_config_is_unreadable);
-    RUN_TEST(load_reports_read_error_naming_jksv_path_when_only_jksv_config_is_unreadable);
+    RUN_TEST(accepts_the_contract_example_file_as_is);
+    RUN_TEST(accepts_the_contract_example_with_crlf_line_endings);
+    RUN_TEST(accepts_the_contract_example_with_utf8_bom);
+    RUN_TEST(reports_each_missing_required_field_by_name_and_path);
+    RUN_TEST(reports_empty_and_blank_text_fields_by_name_and_path);
+    RUN_TEST(rejects_a_token_with_a_space_or_control_or_non_ascii_character);
+    RUN_TEST(error_for_a_bad_token_never_contains_the_token);
+    RUN_TEST(token_length_limit_is_127_characters);
+    RUN_TEST(port_boundaries_are_1024_to_65535);
+    RUN_TEST(rejects_ports_that_are_not_whole_numbers);
+    RUN_TEST(keep_backups_defaults_to_20_when_absent);
+    RUN_TEST(keep_backups_accepts_one_and_larger_whole_numbers);
+    RUN_TEST(keep_backups_rejects_zero_negative_fractional_and_non_numbers);
+    RUN_TEST(rejects_public_loopback_link_local_and_named_hosts);
+    RUN_TEST(accepts_private_hosts_including_the_longest_one);
+    RUN_TEST(phase0_yandex_config_gets_the_exact_legacy_message);
+    RUN_TEST(a_single_phase0_field_is_enough_to_report_legacy);
+    RUN_TEST(legacy_message_does_not_leak_phase0_password);
+    RUN_TEST(new_fields_next_to_leftover_phase0_fields_are_a_normal_config);
+    RUN_TEST(an_empty_object_is_a_missing_field_not_legacy);
+    RUN_TEST(broken_json_reports_parse_error_with_path_and_position);
+    RUN_TEST(empty_or_non_object_json_is_rejected_without_crashing);
+    RUN_TEST(successful_parse_clears_the_error);
+    RUN_TEST(load_reports_missing_file_with_display_path);
+    RUN_TEST(load_reads_the_config_from_the_sd_config_directory);
+    RUN_TEST(load_does_not_fall_back_to_the_phase0_jksv_config);
+    RUN_TEST(load_reports_parse_errors_with_the_display_path);
 }

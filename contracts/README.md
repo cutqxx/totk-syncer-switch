@@ -43,3 +43,24 @@ All responses also carry the header `X-TotkSync-Api: 1` (Switch uses it to tell 
 
 - `status-ok.json`, `status-never-synced.json`, `status-no-save.json`, `status-game-running.json`: `GET /status` (200). Dates have second precision and a UTC offset.
 - `error-unauthorized.json` (401), `error-forbidden.json` (403), `error-not-found.json` (404, unknown path), `error-method-not-allowed.json` (405), `error-internal.json` (500, unexpected launcher error; no details in the body).
+
+## switch-config.example.json
+
+Образец файла, который лаунчер сохраняет как `switch-config.json` (на SD он лежит как `sd:/config/totk-sync/config.json`).
+Switch (`switch/source/core/config.c`) принимает этот файл как есть, а также вариант с CRLF и с UTF-8 BOM (BOM срезается до разбора).
+
+Правила проверки на стороне Switch (одинаковые с ПК там, где ПК тоже проверяет):
+
+- `pc_host`: ровно 4 десятичных октета 0-255 через точку, без ведущих нулей (`192.168.01.10` отклоняется, чтобы не получить восьмеричную трактовку `inet_aton`), без пробелов и знаков. Разрешены только частные диапазоны `10/8`, `172.16/12`, `192.168/16`. **`127/8` отклоняется**, как и в `switch-config.json` на ПК. Имена хостов и IPv6 не поддерживаются.
+- `pc_port`: JSON-число, целое, 1024-65535 (строка `"8765"` отклоняется).
+- `token`: непустая строка из печатных ASCII-символов без пробелов, короче 128 символов. Пустая или состоящая из пробелов строка считается пустым полем. Жёсткой проверки «ровно 64 hex» нет: ПК всегда пишет 64 hex-символа, а Switch лишь гарантирует, что токен можно безопасно положить в заголовок `Authorization`. Очень короткий токен (несколько символов) при вырезании из лога и текстов экрана затронет и посторонний текст с теми же символами.
+- `keep_backups`: необязательное целое не меньше 1, по умолчанию 20.
+- Только поля Яндекса фазы 0 (`origin`, `username`, `password`, `basepath`) без новых полей: `Old Phase 0 config: save switch-config.json from the PC launcher`.
+
+## Как Switch читает ответы лаунчера
+
+- Заголовок `X-TotkSync-Api: 1` есть на всех ответах лаунчера, включая 401 и 403. Имя заголовка сравнивается без учёта регистра.
+- Ответ без этого заголовка (с любым кодом, включая 200 и 401) считается ответом чужого сервера: `Not a TotK Sync launcher at <host>:<port>`.
+- `200` дополнительно проверяется по JSON: `app == "totk-sync"` и `api == 1`, иначе тоже «не лаунчер».
+- `401` с заголовком: `Wrong token: ...`; `403` с заголовком: отдельное сообщение про частную сеть; остальные коды с заголовком (в том числе `500 {"error":"internal"}`): `PC error: HTTP <код>`.
+- Дата `save.modified` показывается как `YYYY-MM-DD HH:MM`, вырезанная из строки (локальное время ПК), без пересчёта по часам Switch.

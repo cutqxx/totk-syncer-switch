@@ -4,7 +4,7 @@
 #include "test.h"
 
 #define PASSWORD "TopSecretAppPassword"
-#define BASIC_B64 "TE9HSU46VG9wU2VjcmV0QXBwUGFzc3dvcmQ=" /* base64("LOGIN:TopSecretAppPassword") */
+#define BASIC_B64 "TE9HSU46VG9wU2VjcmV0QXBwUGFzc3dvcmQ="
 
 static void redacts_authorization_line_and_keeps_crlf(void)
 {
@@ -188,32 +188,6 @@ static void secret_inplace_masks_short_secret_with_as_many_stars_as_characters(v
     CHECK_STR_EQ(two, "x**x");
 }
 
-static void basic_credentials_removes_base64_pair_and_plain_password(void)
-{
-    char text[256] = "Authorization: Basic " BASIC_B64 " and " PASSWORD;
-    redact_basic_credentials_inplace(text, "LOGIN", PASSWORD);
-    CHECK_STR_NOT_CONTAINS(text, BASIC_B64);
-    CHECK_STR_NOT_CONTAINS(text, PASSWORD);
-    CHECK_STR_EQ(text, "Authorization: Basic *** and ***");
-}
-
-static void basic_credentials_removes_base64_with_padding_variants(void)
-{
-    char one_pad[64] = "x dXNlcjE6cA== y"; /* base64("user1:p") */
-    char no_pad[64] = "x dXNlcjpwYXM= y";  /* base64("user:pas") */
-    redact_basic_credentials_inplace(one_pad, "user1", "p");
-    redact_basic_credentials_inplace(no_pad, "user", "pas");
-    CHECK_STR_NOT_CONTAINS(one_pad, "dXNlcjE6cA==");
-    CHECK_STR_NOT_CONTAINS(no_pad, "dXNlcjpwYXM=");
-}
-
-static void basic_credentials_without_credentials_in_text_changes_nothing(void)
-{
-    char text[64] = "HTTP/1.1 201 Created";
-    redact_basic_credentials_inplace(text, "LOGIN", PASSWORD);
-    CHECK_STR_EQ(text, "HTTP/1.1 201 Created");
-}
-
 void run_redact_tests(void)
 {
     RUN_TEST(redacts_authorization_line_and_keeps_crlf);
@@ -239,7 +213,4 @@ void run_redact_tests(void)
     RUN_TEST(secret_inplace_ignores_null_secret);
     RUN_TEST(secret_inplace_ignores_empty_secret);
     RUN_TEST(secret_inplace_masks_short_secret_with_as_many_stars_as_characters);
-    RUN_TEST(basic_credentials_removes_base64_pair_and_plain_password);
-    RUN_TEST(basic_credentials_removes_base64_with_padding_variants);
-    RUN_TEST(basic_credentials_without_credentials_in_text_changes_nothing);
 }

@@ -3,14 +3,12 @@
 
 #include <stdbool.h>
 
-#include "body.h"
-#include "outcome.h"
-#include "request.h"
+#include "http.h"
 
 bool http_curl_global_init(void);
 void http_curl_global_cleanup(void);
 
-/* Refuses to run (local error, no network) when TLS verification is not requested. */
-void http_curl_perform(void *ctx, const upload_request_t *req, const body_t *body, upload_outcome_t *out);
+/* Plain http only (CURLOPT_PROTOCOLS = http, no redirects). Fills *out completely; the caller frees out->body. */
+void http_curl_perform(void *ctx, const http_request_t *req, http_response_t *out);
 
 #endif

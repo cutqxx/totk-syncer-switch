@@ -1,27 +1,18 @@
 #ifndef TS_BODY_H
 #define TS_BODY_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
+/* data is NULL while empty; otherwise it holds size bytes followed by one extra NUL byte. */
 typedef struct {
     unsigned char *data;
     int64_t size;
 } body_t;
 
-typedef enum {
-    BODY_OK,
-    BODY_ERR_NOT_FOUND,
-    BODY_ERR_EMPTY,
-    BODY_ERR_TOO_LARGE,
-    BODY_ERR_READ,
-    BODY_ERR_NO_MEMORY
-} body_status_t;
-
-/* On BODY_ERR_TOO_LARGE, out->size holds the real file size (data stays NULL). */
-body_status_t body_load(const char *fs_path, int64_t max_size, body_t *out);
+/* Returns false (body unchanged) when the result would exceed limit or memory runs out. */
+bool body_append(body_t *body, const void *data, size_t length, int64_t limit);
 void body_free(body_t *body);
-
-void body_status_message(body_status_t status, const char *display_path, int64_t size, int64_t max_size, char *out, size_t out_size);
 
 #endif

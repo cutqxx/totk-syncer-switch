@@ -1,14 +1,11 @@
 #include "redact.h"
 
 #include <stdbool.h>
-#include <stdio.h>
 #include <string.h>
 
 #define AUTH_NAME "Authorization:"
 #define AUTH_REDACTED "Authorization: ***"
 #define MASK_LENGTH 3
-#define MAX_CREDENTIALS_LENGTH 384
-#define BASE64_ALPHABET "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
 static void append_bounded(char *out, size_t out_size, const char *text, size_t length)
 {
@@ -107,31 +104,4 @@ void redact_secret_inplace(char *text, const char *secret)
         }
     }
     *write = '\0';
-}
-
-static void base64_encode(const unsigned char *input, size_t length, char *out)
-{
-    size_t written = 0;
-    for (size_t i = 0; i < length; i += 3) {
-        unsigned long group = (unsigned long)input[i] << 16;
-        group |= i + 1 < length ? (unsigned long)input[i + 1] << 8 : 0;
-        group |= i + 2 < length ? input[i + 2] : 0;
-        out[written++] = BASE64_ALPHABET[(group >> 18) & 63];
-        out[written++] = BASE64_ALPHABET[(group >> 12) & 63];
-        out[written++] = i + 1 < length ? BASE64_ALPHABET[(group >> 6) & 63] : '=';
-        out[written++] = i + 2 < length ? BASE64_ALPHABET[group & 63] : '=';
-    }
-    out[written] = '\0';
-}
-
-void redact_basic_credentials_inplace(char *text, const char *username, const char *password)
-{
-    char credentials[MAX_CREDENTIALS_LENGTH];
-    char encoded[MAX_CREDENTIALS_LENGTH * 2];
-    int length = snprintf(credentials, sizeof credentials, "%s:%s", username, password);
-    if (length > 0 && (size_t)length < sizeof credentials) {
-        base64_encode((const unsigned char *)credentials, (size_t)length, encoded);
-        redact_secret_inplace(text, encoded);
-    }
-    redact_secret_inplace(text, password);
 }

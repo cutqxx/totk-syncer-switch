@@ -1,5 +1,6 @@
 #include "log.h"
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -7,12 +8,15 @@
 #include "paths.h"
 #include "redact.h"
 
-void log_sink_init(log_sink_t *log, const char *sd_root)
+void log_sink_init(log_sink_t *log, const char *sd_root, const char *secret)
 {
     memset(log, 0, sizeof *log);
     paths_fs(sd_root, TS_REL_LOG_DIR, log->dir_path, sizeof log->dir_path);
     paths_fs(sd_root, TS_REL_LOG, log->file_path, sizeof log->file_path);
     log->sd_root_length = strlen(sd_root);
+    if (secret != NULL) {
+        snprintf(log->secret, sizeof log->secret, "%s", secret);
+    }
 }
 
 static void make_log_directories(const log_sink_t *log)
@@ -41,24 +45,32 @@ static bool append_to_file(const log_sink_t *log, const char *entry)
     return fclose(file) == 0 && is_written;
 }
 
-static void format_entry(char *entry, size_t size, const struct tm *t, const char *variant_tag, const char *url,
-                         int64_t body_size, int attempt, int max_attempts, const upload_outcome_t *o)
+static void format_summary(char *out, size_t size, const struct tm *t, const http_request_t *req,
+                           const http_response_t *resp, int attempt, int max_attempts)
+{
+    snprintf(out, size, "[%04d-%02d-%02d %02d:%02d:%02d] %s attempt %d/%d  HTTP %ld  curl %d (%s)  %.1f s  %" PRId64 " B sent",
+             t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec,
+             http_method_name(req->method), attempt, max_attempts, resp->http_code, resp->curl_code,
+             resp->curl_error, resp->seconds, resp->bytes_sent);
+}
+
+static void format_entry(char *entry, size_t size, const struct tm *t, const http_request_t *req,
+                         const http_response_t *resp, int attempt, int max_attempts)
 {
     char summary[TS_LINE_SIZE];
-    outcome_format_line(t, variant_tag, attempt, max_attempts, body_size, o, summary, sizeof summary);
-    snprintf(entry, size, "%s\nURL: %s\n--- headers ---\n", summary, url);
-    redact_headers_append(entry, size, o->headers, strlen(o->headers));
+    format_summary(summary, sizeof summary, t, req, resp, attempt, max_attempts);
+    snprintf(entry, size, "%s\nURL: %s\n--- headers ---\n", summary, req->url);
+    redact_headers_append(entry, size, resp->trace, strlen(resp->trace));
     size_t used = strlen(entry);
     snprintf(entry + used, size - used, "\n\n");
 }
 
-bool log_append_attempt(log_sink_t *log, const struct tm *t, const char *variant_tag, const char *url,
-                        int64_t body_size, int attempt, int max_attempts, const upload_outcome_t *o,
-                        const char *username, const char *password)
+bool log_append_attempt(log_sink_t *log, const struct tm *t, const http_request_t *req, const http_response_t *resp,
+                        int attempt, int max_attempts)
 {
     char entry[TS_LOG_ENTRY_SIZE];
-    format_entry(entry, sizeof entry, t, variant_tag, url, body_size, attempt, max_attempts, o);
-    redact_basic_credentials_inplace(entry, username, password);
+    format_entry(entry, sizeof entry, t, req, resp, attempt, max_attempts);
+    redact_secret_inplace(entry, log->secret);
     bool is_written = append_to_file(log, entry);
     if (!is_written) {
         log->has_failed = true;

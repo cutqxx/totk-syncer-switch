@@ -1,25 +1,24 @@
 #include "config.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "cJSON.h"
+#include "ipv4.h"
 #include "paths.h"
 #include "text.h"
 
 #define UTF8_BOM "\xEF\xBB\xBF"
-
-typedef enum { FIELD_OK, FIELD_MISSING, FIELD_TOO_LONG } field_result_t;
-
-typedef struct {
-    const char *name;
-    char *dest;
-    size_t dest_size;
-} field_t;
+#define FIELD_PC_HOST "pc_host"
+#define FIELD_PC_PORT "pc_port"
+#define FIELD_TOKEN "token"
+#define FIELD_KEEP_BACKUPS "keep_backups"
 
 static config_status_t fail(config_error_t *err, config_status_t status, const char *format, ...)
     __attribute__((format(printf, 3, 4)));
@@ -34,50 +33,116 @@ static config_status_t fail(config_error_t *err, config_status_t status, const c
     return status;
 }
 
-static field_result_t copy_string_field(const cJSON *root, const field_t *field)
+static const cJSON *find_field(const cJSON *root, const char *name)
 {
-    const cJSON *item = cJSON_GetObjectItemCaseSensitive(root, field->name);
-    if (!cJSON_IsString(item) || item->valuestring[0] == '\0') {
-        return FIELD_MISSING;
-    }
-    if (strlen(item->valuestring) >= field->dest_size) {
-        return FIELD_TOO_LONG;
-    }
-    strcpy(field->dest, item->valuestring);
-    return FIELD_OK;
+    return cJSON_GetObjectItemCaseSensitive(root, name);
 }
 
-static config_status_t read_fields(const cJSON *root, config_source_t source, const char *display_path, config_t *out, config_error_t *err)
+static bool is_blank(const char *text)
 {
-    const field_t fields[] = {
-        { "origin", out->origin, sizeof out->origin },
-        { "basepath", out->basepath, sizeof out->basepath },
-        { "username", out->username, sizeof out->username },
-        { "password", out->password, sizeof out->password },
-    };
-    for (size_t i = 0; i < sizeof fields / sizeof fields[0]; i++) {
-        field_result_t result = copy_string_field(root, &fields[i]);
-        bool is_optional_basepath = source == CONFIG_SOURCE_JKSV && i == 1;
-        if (result == FIELD_MISSING && is_optional_basepath) {
-            out->basepath[0] = '\0';
-        } else if (result == FIELD_MISSING) {
-            return fail(err, CONFIG_ERR_FIELD, TXT_CONFIG_FIELD_ERROR, fields[i].name, display_path);
-        } else if (result == FIELD_TOO_LONG) {
-            return fail(err, CONFIG_ERR_FIELD_TOO_LONG, TXT_CONFIG_FIELD_TOO_LONG, fields[i].name, display_path, (int)fields[i].dest_size - 1);
+    for (const char *p = text; *p != '\0'; p++) {
+        if (*p != ' ' && *p != '\t' && *p != '\r' && *p != '\n') {
+            return false;
         }
     }
+    return true;
+}
+
+static bool is_whole_number_in_range(const cJSON *item, double min, double max)
+{
+    if (!cJSON_IsNumber(item)) {
+        return false;
+    }
+    double value = item->valuedouble;
+    return value >= min && value <= max && value == (double)(long long)value;
+}
+
+static bool is_legacy_phase0(const cJSON *root)
+{
+    bool has_new_field = find_field(root, FIELD_PC_HOST) != NULL || find_field(root, FIELD_PC_PORT) != NULL
+                      || find_field(root, FIELD_TOKEN) != NULL;
+    bool has_old_field = find_field(root, "origin") != NULL || find_field(root, "username") != NULL
+                      || find_field(root, "password") != NULL || find_field(root, "basepath") != NULL;
+    return !has_new_field && has_old_field;
+}
+
+static config_status_t read_host(const cJSON *root, const char *display_path, config_t *out, config_error_t *err)
+{
+    const cJSON *item = find_field(root, FIELD_PC_HOST);
+    if (!cJSON_IsString(item) || is_blank(item->valuestring)) {
+        return fail(err, CONFIG_ERR_FIELD, TXT_CONFIG_FIELD_ERROR, FIELD_PC_HOST, display_path);
+    }
+    uint8_t octets[4];
+    if (!ipv4_parse(item->valuestring, octets) || !ipv4_is_private(octets)) {
+        return fail(err, CONFIG_ERR_NOT_PRIVATE_IPV4, TXT_CONFIG_NOT_PRIVATE_IPV4, display_path);
+    }
+    snprintf(out->pc_host, sizeof out->pc_host, "%s", item->valuestring);
     return CONFIG_OK;
 }
 
-static bool append_game_folder(char *basepath, size_t size)
+static config_status_t read_port(const cJSON *root, const char *display_path, config_t *out, config_error_t *err)
 {
-    size_t length = strlen(basepath);
-    while (length > 0 && basepath[length - 1] == '/') {
-        length--;
+    const cJSON *item = find_field(root, FIELD_PC_PORT);
+    if (item == NULL) {
+        return fail(err, CONFIG_ERR_FIELD, TXT_CONFIG_FIELD_ERROR, FIELD_PC_PORT, display_path);
     }
-    basepath[length] = '\0';
-    int written = snprintf(basepath + length, size - length, "%s%s", length > 0 ? "/" : "", TS_GAME_FOLDER);
-    return written >= 0 && (size_t)written < size - length;
+    if (!is_whole_number_in_range(item, CONFIG_PORT_MIN, CONFIG_PORT_MAX)) {
+        return fail(err, CONFIG_ERR_INVALID_VALUE, TXT_CONFIG_PORT_INVALID, display_path);
+    }
+    out->pc_port = (int)item->valuedouble;
+    return CONFIG_OK;
+}
+
+static bool is_printable_ascii_without_space(const char *text)
+{
+    for (const unsigned char *p = (const unsigned char *)text; *p != '\0'; p++) {
+        if (*p <= ' ' || *p >= 0x7F) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static config_status_t read_token(const cJSON *root, const char *display_path, config_t *out, config_error_t *err)
+{
+    const cJSON *item = find_field(root, FIELD_TOKEN);
+    if (!cJSON_IsString(item) || is_blank(item->valuestring)) {
+        return fail(err, CONFIG_ERR_FIELD, TXT_CONFIG_FIELD_ERROR, FIELD_TOKEN, display_path);
+    }
+    if (!is_printable_ascii_without_space(item->valuestring)) {
+        return fail(err, CONFIG_ERR_INVALID_VALUE, TXT_CONFIG_TOKEN_INVALID, display_path);
+    }
+    if (strlen(item->valuestring) >= sizeof out->token) {
+        return fail(err, CONFIG_ERR_FIELD_TOO_LONG, TXT_CONFIG_FIELD_TOO_LONG, FIELD_TOKEN, display_path, (int)sizeof out->token - 1);
+    }
+    strcpy(out->token, item->valuestring);
+    return CONFIG_OK;
+}
+
+static config_status_t read_keep_backups(const cJSON *root, const char *display_path, config_t *out, config_error_t *err)
+{
+    const cJSON *item = find_field(root, FIELD_KEEP_BACKUPS);
+    if (item == NULL) {
+        out->keep_backups = CONFIG_DEFAULT_KEEP_BACKUPS;
+        return CONFIG_OK;
+    }
+    if (!is_whole_number_in_range(item, 1, INT_MAX)) {
+        return fail(err, CONFIG_ERR_INVALID_VALUE, TXT_CONFIG_KEEP_BACKUPS_INVALID, display_path);
+    }
+    out->keep_backups = (int)item->valuedouble;
+    return CONFIG_OK;
+}
+
+static config_status_t read_fields(const cJSON *root, const char *display_path, config_t *out, config_error_t *err)
+{
+    if (is_legacy_phase0(root)) {
+        return fail(err, CONFIG_ERR_LEGACY_PHASE0, "%s", TXT_CONFIG_LEGACY_PHASE0);
+    }
+    config_status_t status = read_host(root, display_path, out, err);
+    if (status == CONFIG_OK) status = read_port(root, display_path, out, err);
+    if (status == CONFIG_OK) status = read_token(root, display_path, out, err);
+    if (status == CONFIG_OK) status = read_keep_backups(root, display_path, out, err);
+    return status;
 }
 
 static void position_of(const char *json, const char *error_pointer, int *line, int *column)
@@ -106,22 +171,7 @@ static config_status_t fail_parse(const char *json, const char *parse_end, const
     return fail(err, CONFIG_ERR_PARSE, TXT_CONFIG_PARSE_ERROR_AT, display_path, line, column);
 }
 
-static config_status_t validate_fields(const cJSON *root, config_source_t source, const char *display_path, config_t *out, config_error_t *err)
-{
-    config_status_t status = read_fields(root, source, display_path, out, err);
-    if (status != CONFIG_OK) {
-        return status;
-    }
-    if (strncmp(out->origin, "https://", 8) != 0) {
-        return fail(err, CONFIG_ERR_INSECURE_ORIGIN, TXT_CONFIG_INSECURE_ORIGIN, display_path);
-    }
-    if (source == CONFIG_SOURCE_JKSV && !append_game_folder(out->basepath, sizeof out->basepath)) {
-        return fail(err, CONFIG_ERR_FIELD_TOO_LONG, TXT_CONFIG_BASEPATH_TOO_LONG, display_path);
-    }
-    return CONFIG_OK;
-}
-
-config_status_t config_parse(const char *json, config_source_t source, const char *display_path, config_t *out, config_error_t *err)
+config_status_t config_parse(const char *json, const char *display_path, config_t *out, config_error_t *err)
 {
     if (strncmp(json, UTF8_BOM, 3) == 0) {
         json += 3;
@@ -131,12 +181,11 @@ config_status_t config_parse(const char *json, config_source_t source, const cha
     if (root == NULL) {
         return fail_parse(json, parse_end, display_path, err);
     }
-    config_status_t status = validate_fields(root, source, display_path, out, err);
+    config_status_t status = read_fields(root, display_path, out, err);
     cJSON_Delete(root);
     if (status != CONFIG_OK) {
         return status;
     }
-    out->source = source;
     snprintf(out->source_display_path, sizeof out->source_display_path, "%s", display_path);
     err->status = CONFIG_OK;
     err->message[0] = '\0';
@@ -184,42 +233,21 @@ static read_status_t read_text_file(const char *path, char **text)
     return status;
 }
 
-static config_status_t load_candidate(const char *sd_root, const char *rel, config_source_t source, config_t *out, config_error_t *err, bool *was_found)
+config_status_t config_load(const char *sd_root, config_t *out, config_error_t *err)
 {
-    char fs_path[256];
+    char fs_path[TS_PATH_SIZE];
     char display_path[128];
-    paths_fs(sd_root, rel, fs_path, sizeof fs_path);
-    paths_display(rel, display_path, sizeof display_path);
+    paths_fs(sd_root, TS_REL_CONFIG, fs_path, sizeof fs_path);
+    paths_display(TS_REL_CONFIG, display_path, sizeof display_path);
     char *json = NULL;
     read_status_t read_status = read_text_file(fs_path, &json);
-    *was_found = read_status != READ_NOT_FOUND;
     if (read_status == READ_NOT_FOUND) {
-        return CONFIG_ERR_NOT_FOUND;
+        return fail(err, CONFIG_ERR_NOT_FOUND, TXT_CONFIG_NOT_FOUND, display_path);
     }
     if (read_status == READ_FAILED) {
         return fail(err, CONFIG_ERR_READ, TXT_CONFIG_READ_ERROR, display_path);
     }
-    config_status_t status = config_parse(json, source, display_path, out, err);
+    config_status_t status = config_parse(json, display_path, out, err);
     free(json);
     return status;
-}
-
-static config_status_t fail_not_found(config_error_t *err)
-{
-    char totk_sync_display[128];
-    char jksv_display[128];
-    paths_display(TS_REL_CONFIG, totk_sync_display, sizeof totk_sync_display);
-    paths_display(TS_REL_JKSV_CONFIG, jksv_display, sizeof jksv_display);
-    return fail(err, CONFIG_ERR_NOT_FOUND, TXT_CONFIG_NOT_FOUND, totk_sync_display, jksv_display);
-}
-
-config_status_t config_load(const char *sd_root, config_t *out, config_error_t *err)
-{
-    bool was_found;
-    config_status_t status = load_candidate(sd_root, TS_REL_CONFIG, CONFIG_SOURCE_TOTK_SYNC, out, err, &was_found);
-    if (was_found) {
-        return status;
-    }
-    status = load_candidate(sd_root, TS_REL_JKSV_CONFIG, CONFIG_SOURCE_JKSV, out, err, &was_found);
-    return was_found ? status : fail_not_found(err);
 }

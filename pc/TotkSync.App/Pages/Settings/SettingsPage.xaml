@@ -46,6 +46,7 @@
                                Visibility="{Binding IsSaveFolderCustom, Converter={StaticResource BoolToVisibility}}" />
                 </StackPanel>
             </ui:CardControl>
+            <controls:FieldError Message="{Binding SaveFolderError}" />
 
             <ui:TextBlock Margin="{StaticResource Space.TopXL}" FontTypography="BodyStrong" Text="Network" />
 
@@ -90,6 +91,7 @@
                            Content="Open data folder"
                            Icon="{ui:SymbolIcon FolderOpen24}" />
             </ui:CardControl>
+            <controls:FieldError Message="{Binding DataFolderError}" />
             <ui:TextBlock Margin="{StaticResource Space.TopS}"
                           Style="{StaticResource CaptionText}"
                           Text="Follows your Windows light or dark theme." />

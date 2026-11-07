@@ -20,15 +20,19 @@ public sealed partial class HomeViewModel : ObservableObject
         SaveStatusCache cache,
         FolderPicker picker,
         ShellOpener shell,
-        Navigator navigator)
+        Navigator navigator,
+        ServerCardViewModel serverCard)
     {
         _settings = settings;
         _cache = cache;
         _picker = picker;
         _shell = shell;
         _navigator = navigator;
+        ServerCard = serverCard;
         Card = SaveCardModel.Empty;
         GameFolderError = "";
+        SaveFolderError = "";
+        OpenFolderError = "";
         IsLoading = true;
         _cache.Changed += ApplyStatus;
         ApplyStatus();
@@ -36,11 +40,19 @@ public sealed partial class HomeViewModel : ObservableObject
 
     public event Action? GameFolderRejected;
 
+    public ServerCardViewModel ServerCard { get; }
+
     [ObservableProperty]
     public partial SaveCardModel Card { get; set; }
 
     [ObservableProperty]
     public partial string GameFolderError { get; set; }
+
+    [ObservableProperty]
+    public partial string SaveFolderError { get; set; }
+
+    [ObservableProperty]
+    public partial string OpenFolderError { get; set; }
 
     [ObservableProperty]
     public partial bool IsLoading { get; set; }
@@ -81,10 +93,10 @@ public sealed partial class HomeViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task UseCandidateAsync(string dir) => await _settings.SetSaveDirAsync(dir);
+    private async Task UseCandidateAsync(string dir) => SaveFolderError = await _settings.SetSaveDirAsync(dir) ?? "";
 
     [RelayCommand]
-    private Task OpenSaveFolderAsync() => _shell.OpenFolderAsync(Card.Folder);
+    private async Task OpenSaveFolderAsync() => OpenFolderError = await _shell.OpenFolderAsync(Card.Folder) ?? "";
 
     [RelayCommand]
     private void OpenSettings() => _navigator.ShowSettings();

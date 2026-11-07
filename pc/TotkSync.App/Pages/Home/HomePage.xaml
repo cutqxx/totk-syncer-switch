@@ -5,7 +5,14 @@
       xmlns:home="clr-namespace:TotkSync.App.Pages.Home"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
     <controls:PageFrame Title="Home">
-        <StackPanel>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="2*" MinWidth="280" />
+            </Grid.ColumnDefinitions>
+            <home:ServerCardView Grid.Column="2" DataContext="{Binding ServerCard}" VerticalAlignment="Top" />
+            <StackPanel Grid.Column="0">
             <StackPanel Orientation="Horizontal"
                         Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}">
                 <ui:ProgressRing Width="20" Height="20" IsIndeterminate="True" />
@@ -62,6 +69,7 @@
                     <home:SaveResultView />
                 </StackPanel>
             </ui:Card>
-        </StackPanel>
+            </StackPanel>
+        </Grid>
     </controls:PageFrame>
 </Page>

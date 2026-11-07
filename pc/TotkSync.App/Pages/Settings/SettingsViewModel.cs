@@ -30,6 +30,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         _shell = shell;
         _paths = paths;
         GameFolderError = "";
+        SaveFolderError = "";
+        DataFolderError = "";
         PortError = "";
         KeepBackupsError = "";
         Refresh();
@@ -53,6 +55,12 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     public partial string GameFolderError { get; set; }
+
+    [ObservableProperty]
+    public partial string SaveFolderError { get; set; }
+
+    [ObservableProperty]
+    public partial string DataFolderError { get; set; }
 
     [ObservableProperty]
     public partial string PortError { get; set; }
@@ -90,15 +98,15 @@ public sealed partial class SettingsViewModel : ObservableObject
         var path = _picker.Pick("Choose the PC save folder");
         if (path is not null)
         {
-            await _settings.SetSaveDirAsync(path);
+            SaveFolderError = await _settings.SetSaveDirAsync(path) ?? "";
         }
     }
 
     [RelayCommand]
-    private Task UseAutomaticSaveFolderAsync() => _settings.SetSaveDirAsync(null);
+    private async Task UseAutomaticSaveFolderAsync() => SaveFolderError = await _settings.SetSaveDirAsync(null) ?? "";
 
     [RelayCommand]
-    private Task OpenDataFolderAsync() => _shell.OpenFolderAsync(_paths.Root);
+    private async Task OpenDataFolderAsync() => DataFolderError = await _shell.OpenAppDataFolderAsync(_paths) ?? "";
 
     private void Refresh()
     {

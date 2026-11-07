@@ -7,6 +7,7 @@ public sealed class SaveStatusCache
     private readonly SettingsSession _settings;
     private readonly SaveStatusReader _reader;
     private int _latestRequest;
+    private SaveStatus? _current;
 
     public SaveStatusCache(SettingsSession settings, SaveStatusReader reader)
     {
@@ -15,7 +16,7 @@ public sealed class SaveStatusCache
         _settings.Changed += () => _ = RefreshAsync();
     }
 
-    public SaveStatus? Current { get; private set; }
+    public SaveStatus? Current => Volatile.Read(ref _current);
 
     public event Action? Changed;
 
@@ -28,7 +29,7 @@ public sealed class SaveStatusCache
         {
             return;
         }
-        Current = status;
+        Volatile.Write(ref _current, status);
         Changed?.Invoke();
     }
 }

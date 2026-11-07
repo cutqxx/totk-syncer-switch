@@ -151,4 +151,73 @@ public class SettingsSessionTests
 
         Assert.Equal(1, fired);
     }
+
+    [Fact]
+    public async Task Concurrent_changes_to_different_settings_are_all_kept()
+    {
+        using var _ = _temp;
+        for (var round = 0; round < 25; round++)
+        {
+            var session = NewSession();
+
+            await Task.WhenAll(
+                session.SetPortAsync(9000 + round),
+                session.SetKeepBackupsAsync(2 + round),
+                session.SetSaveDirAsync($"D:/save{round}"));
+
+            var expected = new LauncherSettings(SaveDir: $"D:/save{round}", Port: 9000 + round, KeepBackups: 2 + round);
+            Assert.Equal(expected, session.Current);
+            Assert.Equal(expected, new SettingsStore(SettingsPath).Load());
+        }
+    }
+
+    [Fact]
+    public async Task Changed_handler_may_apply_another_change_without_deadlock()
+    {
+        using var _ = _temp;
+        var session = NewSession();
+        session.Changed += () =>
+        {
+            if (session.Current.KeepBackups != 7)
+            {
+                session.SetKeepBackupsAsync(7).GetAwaiter().GetResult();
+            }
+        };
+
+        await session.SetPortAsync(9000).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal((9000, 7), (session.Current.Port, session.Current.KeepBackups));
+    }
+
+    [Fact]
+    public async Task Write_failure_returns_a_readable_error_and_keeps_current_settings()
+    {
+        using var _ = _temp;
+        var blocker = _temp.Combine("not-a-directory");
+        File.WriteAllText(blocker, "x");
+        var session = new SettingsSession(new SettingsStore(Path.Combine(blocker, "settings.json")), new LauncherSettings());
+        var fired = 0;
+        session.Changed += () => fired++;
+
+        var error = await session.SetPortAsync(9000);
+
+        Assert.StartsWith("Couldn't save settings: ", error);
+        Assert.Equal((8765, 0), (session.Current.Port, fired));
+    }
+
+    [Fact]
+    public async Task Session_recovers_after_a_failed_write_and_accepts_the_next_change()
+    {
+        using var _ = _temp;
+        var blocker = _temp.Combine("blocker");
+        File.WriteAllText(blocker, "x");
+        var session = new SettingsSession(new SettingsStore(Path.Combine(blocker, "settings.json")), new LauncherSettings());
+        await session.SetPortAsync(9000);
+        File.Delete(blocker);
+
+        var error = await session.SetPortAsync(9001);
+
+        Assert.Null(error);
+        Assert.Equal(9001, session.Current.Port);
+    }
 }

@@ -16,6 +16,7 @@ public enum StatusTone
     Success,
     Caution,
     Attention,
+    Critical,
     Neutral,
 }
 

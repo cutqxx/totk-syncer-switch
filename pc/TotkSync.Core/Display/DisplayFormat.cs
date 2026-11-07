@@ -13,6 +13,16 @@ public static class DisplayFormat
         return value.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
     }
 
+    public static string DateWithSeconds(DateTimeOffset value)
+    {
+        return value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+    }
+
+    public static string TimeWithSeconds(DateTimeOffset value)
+    {
+        return value.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+    }
+
     public static string Size(long bytes)
     {
         return bytes switch

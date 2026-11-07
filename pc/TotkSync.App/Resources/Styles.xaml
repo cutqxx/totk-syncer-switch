@@ -4,6 +4,7 @@
                     xmlns:controls="clr-namespace:TotkSync.App.Controls">
 
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    <controls:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibility" />
 
     <Style x:Key="CaptionText" TargetType="{x:Type ui:TextBlock}">
         <Setter Property="FontTypography" Value="Caption" />

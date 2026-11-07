@@ -8,6 +8,10 @@ public sealed class AppDataPaths(string root)
 
     public string SyncStateFile => Path.Combine(Root, "sync_state", "state.json");
 
+    public string ActivityFile => Path.Combine(Root, "activity.jsonl");
+
+    public string ErrorLogFile => Path.Combine(Root, "error.log");
+
     public string BackupsDir => Path.Combine(Root, "backups");
 
     public static AppDataPaths ForCurrentUser()

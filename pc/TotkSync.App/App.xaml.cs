@@ -1,16 +1,25 @@
 using System.IO;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
-using Wpf.Ui.Appearance;
+using TotkSync.App.Pages.Activity;
+using TotkSync.App.Services;
 using TotkSync.Core.Settings;
 using TotkSync.Core.Status;
+using TotkSync.Server;
+using Wpf.Ui.Appearance;
 
 namespace TotkSync.App;
 
 public partial class App : Application
 {
     private ServiceProvider? _services;
+
+    public App()
+    {
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+    }
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -24,8 +33,7 @@ public partial class App : Application
             return;
         }
         _services = Composition.Build(paths, settings);
-        _services.GetRequiredService<MainWindow>().Show();
-        await _services.GetRequiredService<SaveStatusCache>().RefreshAsync();
+        await StartAsync(_services);
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -34,20 +42,41 @@ public partial class App : Application
         base.OnExit(e);
     }
 
+    private static async Task StartAsync(IServiceProvider services)
+    {
+        var activityLoad = services.GetRequiredService<ActivityViewModel>().InitializeAsync();
+        services.GetRequiredService<MainWindow>().Show();
+        await services.GetRequiredService<SaveStatusCache>().RefreshAsync();
+        await services.GetRequiredService<ServerHost>().StartAsync();
+        await activityLoad;
+    }
+
+    private static void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        UnhandledErrorReporter.Report(AppDataPaths.ForCurrentUser(), e.Exception);
+        e.Handled = true;
+    }
+
     private static async Task<LauncherSettings?> TryLoadSettingsAsync(AppDataPaths paths)
     {
         try
         {
-            return await Task.Run(() => new SettingsStore(paths.SettingsFile).Load());
+            return await Task.Run(() => LoadSettingsWithToken(paths));
         }
-        catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)
+        catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException or InvalidSettingsException)
         {
             MessageBox.Show(
-                $"Couldn't read {paths.SettingsFile}.\n{error.Message}\nFix or delete the file and start TotK Save Sync again.",
+                $"Couldn't use {paths.SettingsFile}.\n{error.Message}\nFix or delete the file and start TotK Save Sync again.",
                 "TotK Save Sync",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
             return null;
         }
+    }
+
+    private static LauncherSettings LoadSettingsWithToken(AppDataPaths paths)
+    {
+        var store = new SettingsStore(paths.SettingsFile);
+        return store.EnsureToken(store.Load());
     }
 }

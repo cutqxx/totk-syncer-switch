@@ -4,8 +4,9 @@ namespace TotkSync.App.Pages.Activity;
 
 public partial class ActivityPage : Page
 {
-    public ActivityPage()
+    public ActivityPage(ActivityViewModel viewModel)
     {
+        DataContext = viewModel;
         InitializeComponent();
     }
 }

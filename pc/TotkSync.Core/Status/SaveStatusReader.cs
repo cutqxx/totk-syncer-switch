@@ -5,9 +5,9 @@ using TotkSync.Core.Sync;
 
 namespace TotkSync.Core.Status;
 
-public sealed class SaveStatusReader(SyncStateStore syncState)
+public class SaveStatusReader(SyncStateStore syncState)
 {
-    public SaveStatus Read(LauncherSettings settings)
+    public virtual SaveStatus Read(LauncherSettings settings)
     {
         if (string.IsNullOrWhiteSpace(settings.GameDir) || SettingsValidator.GameDirError(settings.GameDir) is not null)
         {

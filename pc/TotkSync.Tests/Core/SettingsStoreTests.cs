@@ -118,4 +118,123 @@ public class SettingsStoreTests
 
         Assert.Equal(new LauncherSettings(GameDir: "C:/g"), new SettingsStore(path).Load());
     }
+
+    [Theory]
+    [InlineData(1023, false)]
+    [InlineData(1024, true)]
+    [InlineData(65535, true)]
+    [InlineData(65536, false)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    public void Load_accepts_only_ports_in_1024_to_65535(int port, bool valid)
+    {
+        using var temp = new TempDir();
+        var path = temp.Combine("settings.json");
+        File.WriteAllText(path, $"{{\"port\":{port}}}");
+
+        var load = () => new SettingsStore(path).Load();
+
+        if (valid)
+        {
+            Assert.Equal(port, load().Port);
+        }
+        else
+        {
+            Assert.Contains(path, Assert.Throws<InvalidSettingsException>(load).Message);
+        }
+    }
+
+    [Theory]
+    [InlineData(-5, false)]
+    [InlineData(0, false)]
+    [InlineData(1, true)]
+    [InlineData(20, true)]
+    public void Load_accepts_only_keep_backups_of_at_least_one(int keepBackups, bool valid)
+    {
+        using var temp = new TempDir();
+        var path = temp.Combine("settings.json");
+        File.WriteAllText(path, $"{{\"keep_backups\":{keepBackups}}}");
+
+        var load = () => new SettingsStore(path).Load();
+
+        if (valid)
+        {
+            Assert.Equal(keepBackups, load().KeepBackups);
+        }
+        else
+        {
+            Assert.Throws<InvalidSettingsException>(load);
+        }
+    }
+
+    [Fact]
+    public void Invalid_settings_file_is_left_untouched_by_load()
+    {
+        using var temp = new TempDir();
+        var path = temp.Combine("settings.json");
+        File.WriteAllText(path, "{\"port\":80}");
+
+        Assert.Throws<InvalidSettingsException>(() => new SettingsStore(path).Load());
+
+        Assert.Equal("{\"port\":80}", File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void Ensure_token_generates_and_persists_a_token_when_none_is_stored()
+    {
+        using var temp = new TempDir();
+        var store = new SettingsStore(temp.Combine("settings.json"));
+
+        var ensured = store.EnsureToken(new LauncherSettings(Port: 9000));
+
+        Assert.Matches("^[0-9a-f]{64}$", ensured.Token);
+        Assert.Equal(ensured, store.Load());
+    }
+
+    [Fact]
+    public void Ensure_token_on_next_launch_keeps_the_stored_token()
+    {
+        using var temp = new TempDir();
+        var store = new SettingsStore(temp.Combine("settings.json"));
+        var first = store.EnsureToken(store.Load());
+
+        var second = store.EnsureToken(store.Load());
+
+        Assert.Equal(first.Token, second.Token);
+    }
+
+    [Fact]
+    public void Ensure_token_does_not_write_a_file_when_a_token_already_exists()
+    {
+        using var temp = new TempDir();
+        var path = temp.Combine("settings.json");
+        var settings = new LauncherSettings(Token: "fake-existing-token");
+
+        var ensured = new SettingsStore(path).EnsureToken(settings);
+
+        Assert.Equal(settings, ensured);
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
+    public void Ensure_token_replaces_an_empty_token_and_keeps_other_settings()
+    {
+        using var temp = new TempDir();
+        var store = new SettingsStore(temp.Combine("settings.json"));
+
+        var ensured = store.EnsureToken(new LauncherSettings(Port: 9000, Token: "", KeepBackups: 3));
+
+        Assert.Equal((9000, 3, 64), (ensured.Port, ensured.KeepBackups, ensured.Token!.Length));
+    }
+
+    [Fact]
+    public void Ensure_token_replaces_a_whitespace_only_token()
+    {
+        using var temp = new TempDir();
+        var store = new SettingsStore(temp.Combine("settings.json"));
+
+        var ensured = store.EnsureToken(new LauncherSettings(Token: "   "));
+
+        Assert.Equal(64, ensured.Token!.Length);
+    }
 }

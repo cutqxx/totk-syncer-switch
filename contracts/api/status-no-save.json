@@ -1,0 +1,9 @@
+{
+  "app": "totk-sync",
+  "api": 1,
+  "game_running": false,
+  "save": {
+    "present": false
+  },
+  "last_sync": null
+}

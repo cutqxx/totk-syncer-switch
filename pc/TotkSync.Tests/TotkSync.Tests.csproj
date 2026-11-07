@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\TotkSync.Core\TotkSync.Core.csproj" />
+    <ProjectReference Include="..\TotkSync.Server\TotkSync.Server.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

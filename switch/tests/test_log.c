@@ -8,6 +8,7 @@
 #include "test.h"
 #include "test_fs.h"
 #include "test_support.h"
+#include "env_log.h"
 
 #define LOG_REL "switch/totk-sync/log.txt"
 
@@ -268,6 +269,112 @@ static void retry_tells_the_user_once_when_the_log_cannot_be_written(void)
     http_response_free(&out);
 }
 
+static struct tm note_time(void)
+{
+    struct tm when;
+    memset(&when, 0, sizeof when);
+    when.tm_year = 126;
+    when.tm_mon = 10;
+    when.tm_mday = 7;
+    when.tm_hour = 9;
+    when.tm_min = 5;
+    when.tm_sec = 3;
+    return when;
+}
+
+static void a_note_is_one_timestamped_line(void)
+{
+    char root[256];
+    log_sink_t log;
+    struct tm when = note_time();
+    CHECK(test_fs_make_root(root, sizeof root));
+    log_sink_init(&log, root, CONTRACT_TOKEN);
+    CHECK(log_append_note(&log, &when, "PUT /save: zip 10 B"));
+    char *text;
+    read_log(root, &text);
+    CHECK_STR_EQ(text, "[2026-11-07 09:05:03] PUT /save: zip 10 B\n");
+    free(text);
+}
+
+static void notes_are_appended_not_overwritten(void)
+{
+    char root[256];
+    log_sink_t log;
+    struct tm when = note_time();
+    CHECK(test_fs_make_root(root, sizeof root));
+    log_sink_init(&log, root, CONTRACT_TOKEN);
+    CHECK(log_append_note(&log, &when, "first"));
+    CHECK(log_append_note(&log, &when, "second"));
+    char *text;
+    read_log(root, &text);
+    CHECK_STR_EQ(text, "[2026-11-07 09:05:03] first\n[2026-11-07 09:05:03] second\n");
+    free(text);
+}
+
+static void a_note_never_contains_the_token(void)
+{
+    char root[256];
+    log_sink_t log;
+    struct tm when = note_time();
+    CHECK(test_fs_make_root(root, sizeof root));
+    log_sink_init(&log, root, CONTRACT_TOKEN);
+    CHECK(log_append_note(&log, &when, "echo " CONTRACT_TOKEN " done"));
+    char *text;
+    read_log(root, &text);
+    CHECK_STR_NOT_CONTAINS(text, CONTRACT_TOKEN);
+    CHECK(strstr(text, "echo *** done") != NULL);
+    free(text);
+}
+
+static void a_note_that_cannot_be_written_returns_false_and_warns_once(void)
+{
+    log_sink_t log;
+    struct tm when = note_time();
+    log_sink_init(&log, "build/tmp/no-such-root/nested", CONTRACT_TOKEN);
+    CHECK(!log_append_note(&log, &when, "x"));
+    CHECK(log_take_warning(&log));
+    CHECK(!log_append_note(&log, &when, "y"));
+    CHECK(!log_take_warning(&log));
+}
+
+static void env_log_note_writes_with_the_clock_of_the_environment(void)
+{
+    char root[256];
+    log_sink_t log;
+    fake_world_t world;
+    fake_world_init(&world, NULL, 0);
+    CHECK(test_fs_make_root(root, sizeof root));
+    log_sink_init(&log, root, CONTRACT_TOKEN);
+    world.env.log = &log;
+    env_log_note(&world.env, "a note");
+    char *text;
+    read_log(root, &text);
+    CHECK_STR_EQ(text, "[2026-11-07 12:00:00] a note\n");
+    CHECK_INT_EQ(world.ui_line_count, 0);
+    free(text);
+}
+
+static void env_log_note_without_a_log_shows_nothing(void)
+{
+    fake_world_t world;
+    fake_world_init(&world, NULL, 0);
+    env_log_note(&world.env, "a note");
+    CHECK_INT_EQ(world.ui_line_count, 0);
+}
+
+static void env_log_note_tells_the_user_once_when_the_log_cannot_be_written(void)
+{
+    log_sink_t log;
+    fake_world_t world;
+    fake_world_init(&world, NULL, 0);
+    log_sink_init(&log, "build/tmp/no-such-root/nested", CONTRACT_TOKEN);
+    world.env.log = &log;
+    env_log_note(&world.env, "one");
+    env_log_note(&world.env, "two");
+    CHECK_INT_EQ(world.ui_line_count, 1);
+    CHECK_STR_EQ(world.ui_lines[0], "Log unavailable");
+}
+
 void run_log_tests(void)
 {
     RUN_TEST(log_file_never_contains_the_token_and_authorization_becomes_stars);
@@ -282,4 +389,11 @@ void run_log_tests(void)
     RUN_TEST(no_warning_when_logging_works);
     RUN_TEST(retry_logs_every_attempt_with_its_number);
     RUN_TEST(retry_tells_the_user_once_when_the_log_cannot_be_written);
+    RUN_TEST(a_note_is_one_timestamped_line);
+    RUN_TEST(notes_are_appended_not_overwritten);
+    RUN_TEST(a_note_never_contains_the_token);
+    RUN_TEST(a_note_that_cannot_be_written_returns_false_and_warns_once);
+    RUN_TEST(env_log_note_writes_with_the_clock_of_the_environment);
+    RUN_TEST(env_log_note_without_a_log_shows_nothing);
+    RUN_TEST(env_log_note_tells_the_user_once_when_the_log_cannot_be_written);
 }

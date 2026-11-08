@@ -13,13 +13,23 @@
 
 _Static_assert(TS_HEADER_LINE_SIZE > sizeof BEARER_PREFIX + TS_TOKEN_SIZE, "Authorization header must fit its line");
 
-void api_build_status_request(const config_t *cfg, http_request_t *out)
+void api_add_authorization(http_request_t *req, const config_t *cfg)
 {
     char authorization[TS_HEADER_LINE_SIZE];
-    http_request_init(out, HTTP_GET);
-    snprintf(out->url, sizeof out->url, "http://%s:%d/status", cfg->pc_host, cfg->pc_port);
     snprintf(authorization, sizeof authorization, BEARER_PREFIX "%s", cfg->token);
-    http_request_add_header(out, authorization);
+    http_request_add_header(req, authorization);
+}
+
+void api_format_url(const config_t *cfg, const char *path, char *out, size_t out_size)
+{
+    snprintf(out, out_size, "http://%s:%d%s", cfg->pc_host, cfg->pc_port, path);
+}
+
+void api_build_status_request(const config_t *cfg, http_request_t *out)
+{
+    http_request_init(out, HTTP_GET);
+    api_format_url(cfg, "/status", out->url, sizeof out->url);
+    api_add_authorization(out, cfg);
 }
 
 static bool matches_pattern_char(char pattern, char c)

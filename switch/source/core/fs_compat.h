@@ -1,6 +1,7 @@
 #ifndef TS_FS_COMPAT_H
 #define TS_FS_COMPAT_H
 
+#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 

@@ -18,3 +18,9 @@ bool outcome_should_retry(int curl_code, int attempt, int max_attempts)
     bool is_transient = kind == TRANSPORT_UNREACHABLE || kind == TRANSPORT_DROPPED;
     return is_transient && attempt < max_attempts;
 }
+
+bool outcome_should_retry_unsent(int curl_code, int attempt, int max_attempts)
+{
+    bool is_connect_failure = curl_code == TS_CURLE_RESOLVE || curl_code == TS_CURLE_CONNECT;
+    return is_connect_failure && attempt < max_attempts;
+}

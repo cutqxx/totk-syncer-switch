@@ -33,14 +33,26 @@ static void announce_retry(const sync_env_t *env)
     env->clock->sleep_seconds(env->clock->ctx, TS_RETRY_DELAY_S);
 }
 
-void retry_perform(const sync_env_t *env, const http_request_t *req, http_response_t *out)
+typedef bool (*retry_rule_t)(int curl_code, int attempt, int max_attempts);
+
+static void perform_with_rule(const sync_env_t *env, const http_request_t *req, http_response_t *out, retry_rule_t should_retry)
 {
     int attempt = 1;
     run_attempt(env, req, out, attempt);
-    while (outcome_should_retry(out->curl_code, attempt, TS_MAX_ATTEMPTS)) {
+    while (should_retry(out->curl_code, attempt, TS_MAX_ATTEMPTS)) {
         announce_retry(env);
         http_response_free(out);
         attempt++;
         run_attempt(env, req, out, attempt);
     }
+}
+
+void retry_perform(const sync_env_t *env, const http_request_t *req, http_response_t *out)
+{
+    perform_with_rule(env, req, out, outcome_should_retry);
+}
+
+void retry_perform_unsent(const sync_env_t *env, const http_request_t *req, http_response_t *out)
+{
+    perform_with_rule(env, req, out, outcome_should_retry_unsent);
 }

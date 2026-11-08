@@ -176,6 +176,103 @@ static void a_zero_size_buffer_is_left_untouched(void)
     CHECK(memcmp(guarded, "abcd", 4) == 0);
 }
 
+#define SENT_RESULT "SENT TO PC. PC backup: pc-20261103-142501-before-switch.zip"
+
+static void the_result_block_sits_between_the_status_and_the_button_hints(void)
+{
+    char screen[MAIN_SCREEN_SIZE];
+    config_t cfg;
+    pc_status_t st = online_status();
+    test_make_config(&cfg);
+    main_screen_render_with_result(&cfg, &st, SENT_RESULT, screen, sizeof screen);
+    CHECK_STR_EQ(screen,
+                 "TotK Sync - connect to PC\n\n"
+                 "Config:  sd:/config/totk-sync/config.json\n"
+                 "PC:      http://192.168.1.10:8765\n\n"
+                 "PC: online, save from 2026-11-03 14:25\n"
+                 "\n" SENT_RESULT "\n"
+                 "\nA - Send to PC    R - refresh    + - exit\n");
+}
+
+static void without_a_result_the_screen_equals_the_plain_connected_screen(void)
+{
+    char with_result[MAIN_SCREEN_SIZE];
+    char plain[MAIN_SCREEN_SIZE];
+    config_t cfg;
+    pc_status_t st = online_status();
+    test_make_config(&cfg);
+    main_screen_render_with_result(&cfg, &st, NULL, with_result, sizeof with_result);
+    main_screen_render(&cfg, NULL, &st, plain, sizeof plain);
+    CHECK_STR_EQ(with_result, plain);
+}
+
+static void a_multi_line_result_is_shown_whole(void)
+{
+    char screen[MAIN_SCREEN_SIZE];
+    config_t cfg;
+    test_make_config(&cfg);
+    main_screen_render_with_result(&cfg, NULL, "line one\nline two", screen, sizeof screen);
+    CHECK(strstr(screen, "\nline one\nline two\n\nA - Send to PC") != NULL);
+    CHECK(strstr(screen, "PC: checking...") != NULL);
+}
+
+static void the_screen_with_a_result_never_contains_the_token_and_is_ascii(void)
+{
+    char screen[MAIN_SCREEN_SIZE];
+    config_t cfg;
+    pc_status_t st = online_status();
+    test_make_config(&cfg);
+    main_screen_render_with_result(&cfg, &st, SENT_RESULT, screen, sizeof screen);
+    CHECK_STR_NOT_CONTAINS(screen, CONTRACT_TOKEN);
+    CHECK_STR_NOT_CONTAINS(screen, "token");
+    CHECK(test_is_ascii_text(screen));
+}
+
+static void the_worst_case_result_still_leaves_the_button_hints_in_the_buffer(void)
+{
+    char screen[MAIN_SCREEN_SIZE];
+    char result[TS_LINE_SIZE];
+    config_t cfg;
+    pc_status_t st;
+    test_make_config(&cfg);
+    memset(cfg.source_display_path, 'p', sizeof cfg.source_display_path - 1);
+    cfg.source_display_path[sizeof cfg.source_display_path - 1] = '\0';
+    snprintf(cfg.pc_host, sizeof cfg.pc_host, "192.168.100.100");
+    cfg.pc_port = 65535;
+    memset(&st, 0, sizeof st);
+    memset(st.status_line, 's', sizeof st.status_line - 1);
+    memset(st.detail, 'd', sizeof st.detail - 1);
+    memset(result, 'r', sizeof result - 1);
+    result[sizeof result - 1] = '\0';
+    main_screen_render_with_result(&cfg, &st, result, screen, sizeof screen);
+    CHECK(strstr(screen, result) != NULL);
+    CHECK(strstr(screen, "A - Send to PC    R - refresh    + - exit\n") != NULL);
+}
+
+static void a_small_buffer_is_never_overrun_when_a_result_is_shown(void)
+{
+    config_t cfg;
+    pc_status_t st = online_status();
+    test_make_config(&cfg);
+    for (size_t size = 1; size < MAIN_SCREEN_SIZE + 8; size++) {
+        char guarded[MAIN_SCREEN_SIZE + 16];
+        memset(guarded, 0x5A, sizeof guarded);
+        main_screen_render_with_result(&cfg, &st, SENT_RESULT, guarded, size);
+        CHECK(memchr(guarded, '\0', size) != NULL);
+        CHECK_INT_EQ((unsigned char)guarded[size], 0x5A);
+        CHECK_INT_EQ((unsigned char)guarded[size + 8], 0x5A);
+    }
+}
+
+static void a_zero_size_buffer_is_left_untouched_when_a_result_is_shown(void)
+{
+    char guarded[4] = { 'a', 'b', 'c', 'd' };
+    config_t cfg;
+    test_make_config(&cfg);
+    main_screen_render_with_result(&cfg, NULL, SENT_RESULT, guarded, 0);
+    CHECK(memcmp(guarded, "abcd", 4) == 0);
+}
+
 void run_main_screen_tests(void)
 {
     RUN_TEST(config_error_screen_shows_the_error_with_its_path_and_only_the_exit_hint);
@@ -191,4 +288,11 @@ void run_main_screen_tests(void)
     RUN_TEST(a_small_output_buffer_is_never_overrun_and_stays_terminated);
     RUN_TEST(a_small_output_buffer_is_safe_for_the_error_screen_too);
     RUN_TEST(a_zero_size_buffer_is_left_untouched);
+    RUN_TEST(the_result_block_sits_between_the_status_and_the_button_hints);
+    RUN_TEST(without_a_result_the_screen_equals_the_plain_connected_screen);
+    RUN_TEST(a_multi_line_result_is_shown_whole);
+    RUN_TEST(the_screen_with_a_result_never_contains_the_token_and_is_ascii);
+    RUN_TEST(the_worst_case_result_still_leaves_the_button_hints_in_the_buffer);
+    RUN_TEST(a_small_buffer_is_never_overrun_when_a_result_is_shown);
+    RUN_TEST(a_zero_size_buffer_is_left_untouched_when_a_result_is_shown);
 }

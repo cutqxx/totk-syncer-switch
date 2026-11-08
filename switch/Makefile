@@ -50,20 +50,23 @@ BUILD		:=	build
 APP_TITLE	:=	TotK Sync
 APP_AUTHOR	:=	totk-syncer-switch
 APP_VERSION	:=	0.1.0
-SOURCES		:=	source source/core source/platform third_party/cjson
+SOURCES		:=	source source/core source/platform third_party/cjson third_party/miniz
 DATA		:=
-INCLUDES	:=	source/core source/platform third_party/cjson
+INCLUDES	:=	source/core source/platform third_party/cjson third_party/miniz
 #ROMFS	:=	romfs
 
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
+# miniz: zlib-compatible names off (they clash with -lz used by curl), no stdio file API, no zlib-style API.
+MINIZ_DEFINES	:=	-DMINIZ_NO_ZLIB_COMPATIBLE_NAMES -DMINIZ_NO_STDIO -DMINIZ_NO_ZLIB_APIS
+
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 
 CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 			$(ARCH) $(DEFINES)
 
-CFLAGS	+=	$(INCLUDE) -D__SWITCH__
+CFLAGS	+=	$(INCLUDE) -D__SWITCH__ $(MINIZ_DEFINES)
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions
 

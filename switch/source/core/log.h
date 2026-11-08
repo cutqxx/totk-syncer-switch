@@ -26,6 +26,10 @@ void log_sink_init(log_sink_t *log, const char *sd_root, const char *secret);
 bool log_append_attempt(log_sink_t *log, const struct tm *t, const http_request_t *req, const http_response_t *resp,
                         int attempt, int max_attempts);
 
+/* Appends one timestamped line of plain text (a note, never a body); the secret is removed from it.
+   Returns false and remembers the failure when it cannot be written. */
+bool log_append_note(log_sink_t *log, const struct tm *t, const char *text);
+
 /* True exactly once after the first failure. */
 bool log_take_warning(log_sink_t *log);
 

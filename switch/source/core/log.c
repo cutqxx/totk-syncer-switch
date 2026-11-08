@@ -78,6 +78,19 @@ bool log_append_attempt(log_sink_t *log, const struct tm *t, const http_request_
     return is_written;
 }
 
+bool log_append_note(log_sink_t *log, const struct tm *t, const char *text)
+{
+    char entry[TS_LINE_SIZE + 32];
+    snprintf(entry, sizeof entry, "[%04d-%02d-%02d %02d:%02d:%02d] %s\n", t->tm_year + 1900, t->tm_mon + 1, t->tm_mday,
+             t->tm_hour, t->tm_min, t->tm_sec, text);
+    redact_secret_inplace(entry, log->secret);
+    bool is_written = append_to_file(log, entry);
+    if (!is_written) {
+        log->has_failed = true;
+    }
+    return is_written;
+}
+
 bool log_take_warning(log_sink_t *log)
 {
     if (!log->has_failed || log->is_warning_shown) {

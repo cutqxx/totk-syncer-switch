@@ -23,6 +23,19 @@ bool body_append(body_t *body, const void *data, size_t length, int64_t limit)
     return true;
 }
 
+bool body_adopt(body_t *body, unsigned char *heap_data, int64_t size)
+{
+    unsigned char *terminated = realloc(heap_data, (size_t)size + 1);
+    if (terminated == NULL) {
+        free(heap_data);
+        return false;
+    }
+    terminated[size] = '\0';
+    body->data = terminated;
+    body->size = size;
+    return true;
+}
+
 void body_free(body_t *body)
 {
     free(body->data);

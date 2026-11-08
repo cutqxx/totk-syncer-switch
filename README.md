@@ -114,6 +114,8 @@ pwsh -File build.ps1 test-all    # test + pc-test
 
 Встроенная библиотека JSON: [cJSON](https://github.com/DaveGamble/cJSON), тег v1.7.18, лицензия MIT (`switch/third_party/cjson/`).
 
+Встроенная библиотека ZIP: [miniz](https://github.com/richgel999/miniz) 3.0.2 (амальгама `miniz.c` + `miniz.h`), лицензия MIT (`switch/third_party/miniz/`). Собирается с `-DMINIZ_NO_ZLIB_COMPATIBLE_NAMES` (имена, как у zlib, конфликтуют с `-lz` из curl), `-DMINIZ_NO_STDIO` и `-DMINIZ_NO_ZLIB_APIS`.
+
 ## Безопасность канала
 
 Запросы идут только по `http://` на частный IPv4 из конфига (в libcurl разрешён только протокол http, перенаправления отключены). TLS в этом протоколе нет: защиту дают токен, работа в частной сети и проверка адреса клиента на стороне лаунчера. Не пользуйтесь утилитой в недоверенных сетях (общественный Wi-Fi).

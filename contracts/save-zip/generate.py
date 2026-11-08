@@ -59,6 +59,17 @@ def add_valid(file_name, entries, saved_files, saved_dirs=()):
     })
 
 
+def add_external_valid(file_name, saved_files, saved_dirs):
+    """A valid archive that this script does not write: the Switch tests create it (see contracts/README.md)."""
+    cases.append({
+        "file": file_name,
+        "valid": True,
+        "reason": None,
+        "saved_files": sorted(saved_files, key=lambda name: name.encode("utf-8")),
+        "saved_dirs": sorted(saved_dirs),
+    })
+
+
 def add_invalid(file_name, entries, reason, compress_type=zipfile.ZIP_DEFLATED):
     write_zip(file_name, entries, compress_type)
     cases.append({"file": file_name, "valid": False, "reason": reason})
@@ -87,6 +98,7 @@ def build_valid_cases():
     junk = {"Thumbs.db", "desktop.ini", "x.zip", "picturebook/THUMBS.DB"}
     saved = [name for name in tree_files if name not in junk]
     add_valid("valid-save-tree.zip", [(d + "/", b"") for d in all_dirs] + tree_entries, saved, all_dirs)
+    add_external_valid("valid-from-switch.zip", saved, all_dirs)
     add_valid("valid-minimal.zip", MINIMAL, [name for name, _ in MINIMAL])
     add_valid("valid-empty-dirs.zip", [("album/", b"")] + MINIMAL, [name for name, _ in MINIMAL], ["album"])
     junk_entries = [("desktop.ini", b"x"), ("Thumbs.db", b"x"), ("x.zip", b"x"), ("slot_00/THUMBS.DB", b"x")]

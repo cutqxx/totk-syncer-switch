@@ -177,7 +177,7 @@ config_status_t config_parse(const char *json, const char *display_path, config_
         json += 3;
     }
     const char *parse_end = NULL;
-    cJSON *root = cJSON_ParseWithOpts(json, &parse_end, false);
+    cJSON *root = cJSON_ParseWithOpts(json, &parse_end, true);
     if (root == NULL) {
         return fail_parse(json, parse_end, display_path, err);
     }

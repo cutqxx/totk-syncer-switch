@@ -95,6 +95,13 @@ python -I contracts/save-zip/generate.py
 Тексты `reason` задаёт ПК, Switch показывает их как есть.
 
 - `valid-save-tree.zip`: всё из `save-tree/` (с мусором) плюс пустой `album/`, без заглушки `.nx_save_meta.bin`; отпечаток после распаковки равен `save-tree.fingerprint.txt`. Заглушка не годится как мета-файл JKSV (чужой title ID).
+- `valid-from-switch.zip`: тот же сейв (`save-tree/` плюс пустой `album/`), но собранный кодом Switch (`save_pack_dir`, miniz, `MZ_BEST_SPEED`, единая метка времени 2026-11-03 00:00:00). Создаёт его не `generate.py`, а хостовый тест Switch, в `cases.json` он стоит с теми же `saved_files`/`saved_dirs`, что и `valid-save-tree.zip`. ПК-тесты проверяют его так же, как остальные валидные архивы (verdict и список), и сверяют отпечаток с `save-tree.fingerprint.txt`: так проверяется, что валидатор лаунчера принимает именно то, что кладёт Switch. Тест Switch `the_committed_switch_zip_lists_the_same_entries_as_a_fresh_pack` сравнивает свежую упаковку с файлом по списку `{имя, каталог ли, CRC, размер}` (не побайтно, чтобы обновление miniz не ломало тест). Файл детерминирован: повторная упаковка даёт те же байты. Пересоздать после намеренного изменения формата ZIP:
+
+  ```
+  TS_REGENERATE_CONTRACT_ZIP=1 pwsh -NoProfile -File build.ps1 test
+  ```
+
+  (тест перезаписывает файл и сверяется уже с ним; затем нужно прогнать `pwsh -NoProfile -File build.ps1 pc-test`, чтобы убедиться, что ПК принимает новый архив).
 - `valid-minimal.zip`, `valid-empty-dirs.zip`, `valid-junk-extra.zip`, `valid-jksv-meta.zip` (мета с title ID TotK).
 - Неверные: `invalid-not-zip`, `invalid-crc`, пути (`abs-path`, `dotdot`, `dotdot-inner`, `backslash`, `drive-letter`, `stream-name`, `reserved-name`, `reserved-space-ext` (`CON .txt`), `reserved-spaces-ext` (`nul  .dat`), `trailing-dot`, `trailing-space`, `trailing-dot-dir`, `symlink`), дубликаты (`dup`, `dup-case`, `dup-dir-case`, `file-and-dir`), раскладка (`no-option`, `no-progress`, `wrapped-root`, `slot-out-of-range`), лимиты (`too-many-entries`: 1001 запись; `too-large`: 65 МиБ после распаковки; `compression-bomb`: 8 МиБ нулей в ~8 КиБ, reason `suspicious compression ratio`), мета (`meta-other-title`, `meta-bad-magic`).
 

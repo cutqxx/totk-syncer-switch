@@ -5,6 +5,7 @@
 #include "retry.h"
 #include "test.h"
 #include "test_support.h"
+#include "body.h"
 
 static void classify_maps_curl_codes_to_transport_kinds(void)
 {
@@ -147,6 +148,146 @@ static void the_result_holds_only_the_last_attempt_body(void)
     http_response_free(&out);
 }
 
+/* ---- retry_perform_unsent: for PUT /save, which must not be repeated blindly ---- */
+
+static http_request_t put_request_with_body(const body_t *zip)
+{
+    http_request_t req;
+    http_request_init(&req, HTTP_PUT);
+    req.body = zip;
+    return req;
+}
+
+static void unsent_rule_retries_only_curl_6_and_7_on_the_first_attempt(void)
+{
+    CHECK(outcome_should_retry_unsent(6, 1, 2));
+    CHECK(outcome_should_retry_unsent(7, 1, 2));
+    CHECK(!outcome_should_retry_unsent(6, 2, 2));
+    CHECK(!outcome_should_retry_unsent(7, 2, 2));
+    static const int never[] = { 0, 28, 35, 55, 56, 60, -1 };
+    for (size_t i = 0; i < sizeof never / sizeof never[0]; i++) {
+        CHECK(!outcome_should_retry_unsent(never[i], 1, 2));
+    }
+}
+
+static void a_connection_that_never_opened_is_retried_once_after_3_seconds_for_a_put(void)
+{
+    static const int codes[] = { 6, 7 };
+    for (size_t i = 0; i < sizeof codes / sizeof codes[0]; i++) {
+        const scripted_reply_t script[] = { { 0, codes[i], NULL, NULL }, { 200, 0, LAUNCHER_MARKER_HEADERS, "{}" } };
+        fake_world_t world;
+        body_t zip = { NULL, 0 };
+        http_response_t out;
+        body_append(&zip, "PK-zip-bytes", 12, 100);
+        http_request_t req = put_request_with_body(&zip);
+        fake_world_init(&world, script, 2);
+        retry_perform_unsent(&world.env, &req, &out);
+        CHECK_INT_EQ(world.net_calls, 2);
+        CHECK_INT_EQ(world.sleep_count, 1);
+        CHECK_INT_EQ(world.slept_seconds[0], 3);
+        CHECK_INT_EQ(out.curl_code, 0);
+        CHECK_INT_EQ(out.http_code, 200);
+        http_response_free(&out);
+        body_free(&zip);
+        fake_world_release(&world);
+    }
+}
+
+static void the_retried_put_carries_the_same_body_again(void)
+{
+    const scripted_reply_t script[] = { { 0, 7, NULL, NULL }, { 200, 0, NULL, NULL } };
+    fake_world_t world;
+    body_t zip = { NULL, 0 };
+    http_response_t out;
+    body_append(&zip, "PK-zip-bytes", 12, 100);
+    http_request_t req = put_request_with_body(&zip);
+    fake_world_init(&world, script, 2);
+    retry_perform_unsent(&world.env, &req, &out);
+    CHECK_INT_EQ(world.net_calls, 2);
+    CHECK_INT_EQ(world.sent_body.size, 12);
+    CHECK(memcmp(world.sent_body.data, "PK-zip-bytes", 12) == 0);
+    CHECK(!world.is_sent_body_changed);
+    CHECK(world.last_request.body == &zip);
+    http_response_free(&out);
+    body_free(&zip);
+    fake_world_release(&world);
+}
+
+static void the_unsent_retry_is_announced_on_screen(void)
+{
+    const scripted_reply_t script[] = { { 0, 6, NULL, NULL }, { 200, 0, NULL, NULL } };
+    fake_world_t world;
+    http_request_t req = put_request_with_body(NULL);
+    http_response_t out;
+    fake_world_init(&world, script, 2);
+    retry_perform_unsent(&world.env, &req, &out);
+    CHECK_INT_EQ(world.ui_line_count, 1);
+    CHECK_STR_EQ(world.ui_lines[0], "Retrying in 3 s...");
+    http_response_free(&out);
+}
+
+static void a_timeout_or_dropped_connection_is_never_retried_for_a_put(void)
+{
+    static const int codes[] = { 28, 55, 56, 35, 60 };
+    for (size_t i = 0; i < sizeof codes / sizeof codes[0]; i++) {
+        const scripted_reply_t script[] = { { 0, codes[i], NULL, NULL }, { 200, 0, NULL, NULL } };
+        fake_world_t world;
+        http_request_t req = put_request_with_body(NULL);
+        http_response_t out;
+        fake_world_init(&world, script, 2);
+        retry_perform_unsent(&world.env, &req, &out);
+        CHECK_INT_EQ(world.net_calls, 1);
+        CHECK_INT_EQ(world.sleep_count, 0);
+        CHECK_INT_EQ(world.ui_line_count, 0);
+        CHECK_INT_EQ(out.curl_code, codes[i]);
+        http_response_free(&out);
+    }
+}
+
+static void an_http_answer_is_never_retried_for_a_put(void)
+{
+    static const long codes[] = { 200, 400, 401, 403, 404, 413, 423, 500, 503 };
+    for (size_t i = 0; i < sizeof codes / sizeof codes[0]; i++) {
+        const scripted_reply_t script[] = { { codes[i], 0, NULL, NULL } };
+        fake_world_t world;
+        http_request_t req = put_request_with_body(NULL);
+        http_response_t out;
+        fake_world_init(&world, script, 1);
+        retry_perform_unsent(&world.env, &req, &out);
+        CHECK_INT_EQ(world.net_calls, 1);
+        CHECK_INT_EQ(world.sleep_count, 0);
+        CHECK_INT_EQ(out.http_code, codes[i]);
+        http_response_free(&out);
+    }
+}
+
+static void a_put_gives_up_after_the_second_connection_failure(void)
+{
+    const scripted_reply_t script[] = { { 0, 7, NULL, NULL }, { 0, 6, NULL, NULL }, { 200, 0, NULL, NULL } };
+    fake_world_t world;
+    http_request_t req = put_request_with_body(NULL);
+    http_response_t out;
+    fake_world_init(&world, script, 3);
+    retry_perform_unsent(&world.env, &req, &out);
+    CHECK_INT_EQ(world.net_calls, 2);
+    CHECK_INT_EQ(world.sleep_count, 1);
+    CHECK_INT_EQ(out.curl_code, 6);
+    http_response_free(&out);
+}
+
+static void a_put_that_fails_to_connect_and_then_drops_the_connection_is_not_tried_a_third_time(void)
+{
+    const scripted_reply_t script[] = { { 0, 7, NULL, NULL }, { 0, 56, NULL, NULL }, { 200, 0, NULL, NULL } };
+    fake_world_t world;
+    http_request_t req = put_request_with_body(NULL);
+    http_response_t out;
+    fake_world_init(&world, script, 3);
+    retry_perform_unsent(&world.env, &req, &out);
+    CHECK_INT_EQ(world.net_calls, 2);
+    CHECK_INT_EQ(out.curl_code, 56);
+    http_response_free(&out);
+}
+
 void run_retry_tests(void)
 {
     RUN_TEST(classify_maps_curl_codes_to_transport_kinds);
@@ -159,4 +300,12 @@ void run_retry_tests(void)
     RUN_TEST(non_transient_curl_errors_are_not_retried);
     RUN_TEST(the_retry_sends_the_same_request);
     RUN_TEST(the_result_holds_only_the_last_attempt_body);
+    RUN_TEST(unsent_rule_retries_only_curl_6_and_7_on_the_first_attempt);
+    RUN_TEST(a_connection_that_never_opened_is_retried_once_after_3_seconds_for_a_put);
+    RUN_TEST(the_retried_put_carries_the_same_body_again);
+    RUN_TEST(the_unsent_retry_is_announced_on_screen);
+    RUN_TEST(a_timeout_or_dropped_connection_is_never_retried_for_a_put);
+    RUN_TEST(an_http_answer_is_never_retried_for_a_put);
+    RUN_TEST(a_put_gives_up_after_the_second_connection_failure);
+    RUN_TEST(a_put_that_fails_to_connect_and_then_drops_the_connection_is_not_tried_a_third_time);
 }

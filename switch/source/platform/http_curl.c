@@ -11,6 +11,7 @@ _Static_assert((int)CURLE_OK == TS_CURLE_OK, "curl code mirror");
 _Static_assert((int)CURLE_COULDNT_RESOLVE_HOST == TS_CURLE_RESOLVE, "curl code mirror");
 _Static_assert((int)CURLE_COULDNT_CONNECT == TS_CURLE_CONNECT, "curl code mirror");
 _Static_assert((int)CURLE_OPERATION_TIMEDOUT == TS_CURLE_TIMEOUT, "curl code mirror");
+_Static_assert((int)CURLE_SEND_ERROR == TS_CURLE_SEND, "curl code mirror");
 _Static_assert((int)CURLE_RECV_ERROR == TS_CURLE_RECV, "curl code mirror");
 
 typedef struct {
@@ -76,6 +77,13 @@ static struct curl_slist *build_header_list(const http_request_t *req)
     return list;
 }
 
+static void configure_expect_100_timeout(CURL *curl, const http_request_t *req)
+{
+    if (req->expect_100_timeout_ms > 0) {
+        curl_easy_setopt(curl, CURLOPT_EXPECT_100_TIMEOUT_MS, req->expect_100_timeout_ms);
+    }
+}
+
 static void configure_request_body(CURL *curl, const http_request_t *req, read_source_t *source)
 {
     int64_t size = req->body != NULL ? req->body->size : 0;
@@ -84,6 +92,7 @@ static void configure_request_body(CURL *curl, const http_request_t *req, read_s
         curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)size);
         curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_from_buffer);
         curl_easy_setopt(curl, CURLOPT_READDATA, source);
+        configure_expect_100_timeout(curl, req);
     } else if (req->method == HTTP_POST) {
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, size > 0 ? (const char *)req->body->data : "");

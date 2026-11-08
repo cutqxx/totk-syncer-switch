@@ -38,7 +38,7 @@ public sealed class SaveZipContractTests
         var listed = LoadCases().Select(item => item.GetProperty("file").GetString()!).Order(StringComparer.Ordinal).ToList();
         var onDisk = Directory.EnumerateFiles(ZipDir, "*.zip").Select(path => Path.GetFileName(path)).Order(StringComparer.Ordinal).ToList();
 
-        Assert.Equal(33, listed.Count);
+        Assert.Equal(34, listed.Count);
         Assert.Equal(onDisk, listed);
     }
 
@@ -67,6 +67,14 @@ public sealed class SaveZipContractTests
     public void Valid_save_tree_zip_has_the_contract_fingerprint()
     {
         var zip = ZipBuilder.Unwrap(SaveZipValidator.Validate(ZipBuilder.ContractZip("valid-save-tree.zip")));
+
+        Assert.Equal(SaveTreeBuilder.ContractFingerprint, Fingerprint.OfZip(zip));
+    }
+
+    [Fact]
+    public void Zip_built_by_the_switch_packer_has_the_contract_fingerprint()
+    {
+        var zip = ZipBuilder.Unwrap(SaveZipValidator.Validate(ZipBuilder.ContractZip("valid-from-switch.zip")));
 
         Assert.Equal(SaveTreeBuilder.ContractFingerprint, Fingerprint.OfZip(zip));
     }

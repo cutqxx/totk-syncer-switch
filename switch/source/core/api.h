@@ -2,6 +2,7 @@
 #define TS_API_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "config.h"
 #include "http.h"
@@ -29,6 +30,12 @@ typedef struct {
     bool save_present;
     char save_modified[API_MODIFIED_SIZE]; /* valid when save_present */
 } api_status_t;
+
+/* Adds "Authorization: Bearer <token>" (redacted to *** everywhere it is logged). */
+void api_add_authorization(http_request_t *req, const config_t *cfg);
+
+/* "http://<pc_host>:<pc_port><path>", path starting with '/'. */
+void api_format_url(const config_t *cfg, const char *path, char *out, size_t out_size);
 
 /* GET http://<pc_host>:<pc_port>/status with "Authorization: Bearer <token>". */
 void api_build_status_request(const config_t *cfg, http_request_t *out);

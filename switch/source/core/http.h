@@ -18,6 +18,7 @@ typedef struct {
     int64_t max_response_bytes;
     long connect_timeout_s;
     long total_timeout_s;
+    long expect_100_timeout_ms; /* 0: curl default; otherwise how long to wait for "100 Continue" or an early final answer */
 } http_request_t;
 
 typedef struct {

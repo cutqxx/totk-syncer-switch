@@ -13,6 +13,9 @@ typedef struct {
 
 /* Returns false (body unchanged) when the result would exceed limit or memory runs out. */
 bool body_append(body_t *body, const void *data, size_t length, int64_t limit);
+/* Takes over a malloc'd buffer of size bytes (the body must be empty); on success the buffer is grown by the trailing NUL.
+   On failure (memory) the buffer is freed and the body stays empty. */
+bool body_adopt(body_t *body, unsigned char *heap_data, int64_t size);
 void body_free(body_t *body);
 
 #endif

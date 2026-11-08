@@ -5,6 +5,7 @@ public static class SaveLayout
     public const string OptionFile = "option.sav";
     public const string ProgressFile = "progress.sav";
     public const int SlotCount = 6;
+    public const ulong TitleId = 0x0100F2C0115B6000;
 
     public static string SlotDirectory(int slot) => $"slot_{slot:00}";
 

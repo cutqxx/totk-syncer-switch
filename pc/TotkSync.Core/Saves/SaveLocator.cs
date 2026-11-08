@@ -1,3 +1,5 @@
+using TotkSync.Core.Replace;
+
 namespace TotkSync.Core.Saves;
 
 public sealed record SaveCandidate(string Dir, DateTimeOffset Modified);
@@ -41,14 +43,26 @@ public static class SaveLocator
         };
     }
 
+    public static string? ParentDirectory(string? gameDir, string? saveDirOverride)
+    {
+        if (!string.IsNullOrWhiteSpace(saveDirOverride))
+        {
+            return Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(saveDirOverride));
+        }
+        return string.IsNullOrWhiteSpace(gameDir) ? null : ProfileDirectory(gameDir);
+    }
+
+    private static string ProfileDirectory(string gameDir) => Path.Combine(gameDir, "profile");
+
     private static IReadOnlyList<SaveCandidate> FindCandidates(string gameDir)
     {
-        var profileDir = Path.Combine(gameDir, "profile");
+        var profileDir = ProfileDirectory(gameDir);
         if (!Directory.Exists(profileDir))
         {
             return [];
         }
         return Directory.EnumerateDirectories(profileDir)
+            .Where(dir => !StagingNames.IsLeftover(dir))
             .Where(SaveLayout.IsSaveDirectory)
             .Order(StringComparer.OrdinalIgnoreCase)
             .Select(ToCandidate)

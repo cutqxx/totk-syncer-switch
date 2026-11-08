@@ -64,3 +64,38 @@ Switch (`switch/source/core/config.c`) принимает этот файл ка
 - `200` дополнительно проверяется по JSON: `app == "totk-sync"` и `api == 1`, иначе тоже «не лаунчер».
 - `401` с заголовком: `Wrong token: ...`; `403` с заголовком: отдельное сообщение про частную сеть; остальные коды с заголовком (в том числе `500 {"error":"internal"}`): `PC error: HTTP <код>`.
 - Дата `save.modified` показывается как `YYYY-MM-DD HH:MM`, вырезанная из строки (локальное время ПК), без пересчёта по часам Switch.
+
+## PUT /save (слайс 1.5)
+
+Тело запроса: ZIP сейва как есть, `Content-Length` обязателен. Параметр `?force=1` в слайсе 1.5 игнорируется (конфликты появятся в 1.7).
+Ответы (все с заголовком `X-TotkSync-Api: 1`):
+
+| Код | Файл | Когда |
+|---|---|---|
+| 200 | `api/put-replaced.json` | сейв заменён, в ответе имя бэкапа и отпечаток |
+| 400 | `api/error-invalid-zip.json` | ZIP нарушает правила; `reason` из `save-zip/cases.json` |
+| 404 | `api/error-no-save.json` | на ПК нет сейва (или `save_dir` указывает не на сейв) |
+| 411 | `api/error-length-required.json` | нет `Content-Length` (в том числе chunked) |
+| 413 | `api/error-too-large.json` | `Content-Length` больше 64 МиБ |
+| 423 | `api/error-game-running.json` | запущен `totk.exe` |
+| 503 | `api/error-busy.json` | уже идёт другая запись |
+| 500 | `api/error-write-failed.json` | бэкап или замена не удались (сейв ПК не изменён), либо найдено несколько папок сейва, либо загрузка оборвалась |
+
+Отказы 404/411/413/423 приходят до чтения тела (при `Expect: 100-continue` тело вообще не отправляется).
+
+## save-zip/
+
+Тестовые ZIP для правил «Валидный ZIP сейва». Создаются независимым скриптом (только стандартная библиотека Python, без кода лаунчера), результат детерминирован:
+
+```
+python -I contracts/save-zip/generate.py
+```
+
+`cases.json`: список `{file, valid, reason}`. Для валидных ещё `saved_files` и `saved_dirs`: что должно оказаться в папке сейва (без мусора и без `.nx_save_meta.bin`).
+Тексты `reason` задаёт ПК, Switch показывает их как есть.
+
+- `valid-save-tree.zip`: всё из `save-tree/` (с мусором) плюс пустой `album/`, без заглушки `.nx_save_meta.bin`; отпечаток после распаковки равен `save-tree.fingerprint.txt`. Заглушка не годится как мета-файл JKSV (чужой title ID).
+- `valid-minimal.zip`, `valid-empty-dirs.zip`, `valid-junk-extra.zip`, `valid-jksv-meta.zip` (мета с title ID TotK).
+- Неверные: `invalid-not-zip`, `invalid-crc`, пути (`abs-path`, `dotdot`, `dotdot-inner`, `backslash`, `drive-letter`, `stream-name`, `reserved-name`, `reserved-space-ext` (`CON .txt`), `reserved-spaces-ext` (`nul  .dat`), `trailing-dot`, `trailing-space`, `trailing-dot-dir`, `symlink`), дубликаты (`dup`, `dup-case`, `dup-dir-case`, `file-and-dir`), раскладка (`no-option`, `no-progress`, `wrapped-root`, `slot-out-of-range`), лимиты (`too-many-entries`: 1001 запись; `too-large`: 65 МиБ после распаковки; `compression-bomb`: 8 МиБ нулей в ~8 КиБ, reason `suspicious compression ratio`), мета (`meta-other-title`, `meta-bad-magic`).
+
+Дополнительно к правилам спека лаунчер отклоняет символы `<>:"\|?*`, управляющие символы, имена с точкой или пробелом в конце любого сегмента пути, зарезервированные имена Windows (`NUL`, `CON`, `CONIN$`...), в том числе с пробелами перед расширением (`CON .txt`), записи-символические ссылки и конфликт «файл и каталог с одним путём». Сравнение путей без учёта регистра. Распаковка не доверяет заголовку размера: запись читается ровно на заявленную длину и не дальше, сумма заявленных длин не больше 64 МиБ, а при распаковке от 4 МиБ коэффициент сжатия не больше 200:1 (иначе `suspicious compression ratio`).

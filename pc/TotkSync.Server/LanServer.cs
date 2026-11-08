@@ -6,12 +6,14 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using TotkSync.Core.Zip;
 
 namespace TotkSync.Server;
 
 public sealed class LanServer : IAsyncDisposable
 {
-    private const long MaxRequestBodyBytes = 64L * 1024 * 1024;
+    private const double MinBodyBytesPerSecond = 1024;
+    private static readonly TimeSpan MinBodyRateGracePeriod = TimeSpan.FromSeconds(10);
 
     private readonly WebApplication _app;
 
@@ -59,7 +61,8 @@ public sealed class LanServer : IAsyncDisposable
     private static void ConfigureKestrel(KestrelServerOptions kestrel, IPAddress ip, int port)
     {
         kestrel.AddServerHeader = false;
-        kestrel.Limits.MaxRequestBodySize = MaxRequestBodyBytes;
+        kestrel.Limits.MaxRequestBodySize = SaveZipLimits.MaxZipBytes;
+        kestrel.Limits.MinRequestBodyDataRate = new MinDataRate(MinBodyBytesPerSecond, MinBodyRateGracePeriod);
         kestrel.Listen(ip, port);
     }
 

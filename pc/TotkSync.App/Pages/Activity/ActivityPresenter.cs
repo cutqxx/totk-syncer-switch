@@ -32,6 +32,15 @@ public static class ActivityPresenter
             ActivityKind.NotFound => "Not found",
             ActivityKind.MethodNotAllowed => "Method not allowed",
             ActivityKind.Internal => "Launcher error",
+            ActivityKind.SaveReplaced => "Save received from Switch",
+            ActivityKind.InvalidZip => "Rejected: invalid save ZIP",
+            ActivityKind.NoSave => "Rejected: no PC save yet",
+            ActivityKind.Conflict => "Rejected: PC save changed since last sync",
+            ActivityKind.LengthRequired => "Rejected: Content-Length missing",
+            ActivityKind.TooLarge => "Rejected: save is too large",
+            ActivityKind.GameRunning => "Rejected: TotK is running",
+            ActivityKind.Busy => "Rejected: another transfer is in progress",
+            ActivityKind.WriteFailed => "Save write failed",
             ActivityKind.Other => "Other response",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
@@ -39,6 +48,6 @@ public static class ActivityPresenter
 
     private static SymbolRegular Symbol(ActivityKind kind)
     {
-        return kind == ActivityKind.StatusOk ? SymbolRegular.CheckmarkCircle16 : SymbolRegular.ErrorCircle16;
+        return kind is ActivityKind.StatusOk or ActivityKind.SaveReplaced ? SymbolRegular.CheckmarkCircle16 : SymbolRegular.ErrorCircle16;
     }
 }

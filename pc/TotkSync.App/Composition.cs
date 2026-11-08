@@ -6,7 +6,9 @@ using TotkSync.App.Pages.Home;
 using TotkSync.App.Pages.Settings;
 using TotkSync.App.Services;
 using TotkSync.Core.Activity;
+using TotkSync.Core.Backups;
 using TotkSync.Core.Game;
+using TotkSync.Core.Replace;
 using TotkSync.Core.Settings;
 using TotkSync.Core.Pairing;
 using TotkSync.Core.Status;
@@ -39,13 +41,28 @@ public static class Composition
         services.AddSingleton<IGameProcess, GameProcess>();
         services.AddSingleton<StatusQuery>();
         services.AddSingleton(new ActivityLog(paths.ActivityFile));
+        AddSaveReceiving(services, paths);
         services.AddSingleton(provider => new ServerHost(
             provider.GetRequiredService<SettingsSession>(),
             provider.GetRequiredService<StatusQuery>(),
             provider.GetRequiredService<ActivityLog>(),
             provider.GetRequiredService<TimeProvider>(),
             IPAddress.Any,
-            LanAddresses.Detect));
+            LanAddresses.Detect,
+            provider.GetRequiredService<SaveReceiver>()));
+    }
+
+    private static void AddSaveReceiving(IServiceCollection services, AppDataPaths paths)
+    {
+        services.AddSingleton<IFileOps, FileOps>();
+        services.AddSingleton<TransferGate>();
+        services.AddSingleton(provider => new BackupStore(
+            paths.BackupsDir,
+            provider.GetRequiredService<IFileOps>(),
+            provider.GetRequiredService<TimeProvider>()));
+        services.AddSingleton<MirrorReplacer>();
+        services.AddSingleton<LeftoverRecovery>();
+        services.AddSingleton<SaveReceiver>();
     }
 
     private static void AddUiServices(IServiceCollection services)

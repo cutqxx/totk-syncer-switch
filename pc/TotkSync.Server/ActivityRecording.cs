@@ -6,6 +6,7 @@ namespace TotkSync.Server;
 
 internal static class ActivityRecording
 {
+    private const string KindItemKey = "totksync.activity-kind";
     private const int MaxMethodLength = 16;
     private const int MaxPathLength = 200;
 
@@ -22,6 +23,11 @@ internal static class ActivityRecording
                 TryAppend(log, context, time);
             }
         };
+    }
+
+    public static void SetKind(HttpContext context, ActivityKind kind)
+    {
+        context.Items[KindItemKey] = kind;
     }
 
     private static void TryAppend(ActivityLog log, HttpContext context, TimeProvider time)
@@ -44,7 +50,7 @@ internal static class ActivityRecording
             Truncate(context.Request.Method, MaxMethodLength),
             Truncate(context.Request.Path.Value ?? "", MaxPathLength),
             context.Response.StatusCode,
-            KindOf(context.Response.StatusCode));
+            context.Items[KindItemKey] as ActivityKind? ?? KindOf(context.Response.StatusCode));
     }
 
     private static string ClientAddress(HttpContext context)

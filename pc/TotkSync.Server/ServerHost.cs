@@ -2,6 +2,7 @@ using System.Net;
 using TotkSync.Core.Activity;
 using TotkSync.Core.Settings;
 using TotkSync.Core.Status;
+using TotkSync.Core.Sync;
 
 namespace TotkSync.Server;
 
@@ -25,7 +26,8 @@ public sealed class ServerHost(
     ActivityLog activity,
     TimeProvider time,
     IPAddress listenAddress,
-    Func<IReadOnlyList<IPAddress>> detectLanAddresses)
+    Func<IReadOnlyList<IPAddress>> detectLanAddresses,
+    SaveReceiver? receiver = null)
 {
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private LanServer? _server;
@@ -94,7 +96,7 @@ public sealed class ServerHost(
         var port = settings.Current.Port;
         Publish(ServerState.Starting(port));
         var addresses = await Task.Run(detectLanAddresses);
-        var deps = new ApiDeps(settings.Current.Token ?? "", status, activity, time);
+        var deps = new ApiDeps(settings.Current.Token ?? "", status, activity, time, receiver);
         var result = await LanServer.StartAsync(listenAddress, port, deps);
         Publish(ToState(result, port, addresses));
     }

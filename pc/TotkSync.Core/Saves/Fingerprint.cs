@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using TotkSync.Core.Zip;
 
 namespace TotkSync.Core.Saves;
 
@@ -23,6 +24,11 @@ public static class Fingerprint
     }
 
     public static string OfDirectory(string dir) => OfFiles(SaveFile.Enumerate(dir));
+
+    public static string OfZip(ValidatedSaveZip zip)
+    {
+        return Compute(zip.Files.Select(file => (file.RelPath, SHA256.HashData(file.Content))));
+    }
 
     private static IEnumerable<(string RelPath, byte[] Sha256)> SortByUtf8Bytes(
         IEnumerable<(string RelPath, byte[] Sha256)> files)

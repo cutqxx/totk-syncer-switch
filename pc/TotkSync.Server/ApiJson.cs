@@ -16,7 +16,13 @@ public sealed record LastSyncDto(string Fingerprint, string At, SyncDirection Di
 
 public sealed record ErrorResponse(string Error);
 
+public sealed record ReasonedErrorResponse(string Error, string Reason);
+
+public sealed record PutReplacedResponse(string Result, string Backup, string Fingerprint);
+
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
 [JsonSerializable(typeof(StatusResponse))]
 [JsonSerializable(typeof(ErrorResponse))]
+[JsonSerializable(typeof(ReasonedErrorResponse))]
+[JsonSerializable(typeof(PutReplacedResponse))]
 internal sealed partial class ApiJsonContext : JsonSerializerContext;

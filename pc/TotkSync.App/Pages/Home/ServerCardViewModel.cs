@@ -1,3 +1,4 @@
+using System.Net;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TotkSync.App.Services;
@@ -16,6 +17,7 @@ public sealed partial class ServerCardViewModel : ObservableObject
     private readonly UiThread _ui;
     private readonly ClipboardService _clipboard;
     private readonly Toast _toast;
+    private IPAddress? _preferredIp;
 
     public ServerCardViewModel(
         ServerHost host,
@@ -69,17 +71,24 @@ public sealed partial class ServerCardViewModel : ObservableObject
     {
         Card = ServerCardPresenter.From(_host.State);
         Pairing.IsServerRunning = _host.State.Phase == ServerPhase.Running;
-        SelectedAddress = KeptAddress() ?? Card.FirstAddress;
+        SelectedAddress = PreferredAddress() ?? Card.FirstAddress;
     }
 
-    private ServerAddress? KeptAddress()
+    private ServerAddress? PreferredAddress()
     {
-        return SelectedAddress is { } current
-            ? Card.Addresses.FirstOrDefault(address => address.Ip.Equals(current.Ip))
+        return _preferredIp is { } preferred
+            ? Card.Addresses.FirstOrDefault(address => address.Ip.Equals(preferred))
             : null;
     }
 
-    partial void OnSelectedAddressChanged(ServerAddress? value) => Pairing.SelectedAddress = value;
+    partial void OnSelectedAddressChanged(ServerAddress? value)
+    {
+        if (value is not null)
+        {
+            _preferredIp = value.Ip;
+        }
+        Pairing.SelectedAddress = value;
+    }
 
     private void ShowLastRequest(ActivityEntry entry)
     {

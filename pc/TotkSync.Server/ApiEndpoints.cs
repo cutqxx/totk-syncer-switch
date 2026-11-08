@@ -9,6 +9,10 @@ internal static class ApiEndpoints
     public static void Map(IEndpointRouteBuilder routes, ApiDeps deps)
     {
         routes.Map("/status", context => AllowOnly(HttpMethods.Get, context, () => WriteStatus(context, deps)));
+        if (deps.Receiver is { } receiver)
+        {
+            routes.Map("/save", context => AllowOnly(HttpMethods.Put, context, () => SaveEndpoint.PutAsync(context, receiver)));
+        }
         routes.MapFallback("{*path}", context => ApiErrors.WriteAsync(context, StatusCodes.Status404NotFound, ApiErrors.NotFound));
     }
 

@@ -10,6 +10,7 @@ using TotkSync.Core.Activity;
 using TotkSync.Core.Backups;
 using TotkSync.Core.Game;
 using TotkSync.Core.Replace;
+using TotkSync.Core.Saves;
 using TotkSync.Core.Settings;
 using TotkSync.Core.Pairing;
 using TotkSync.Core.Status;
@@ -61,7 +62,8 @@ public static class Composition
             provider.GetRequiredService<TransferGate>(),
             provider.GetRequiredService<SaveStatusCache>(),
             provider.GetRequiredService<TimeProvider>(),
-            error => RecoveryLog.Append(provider.GetRequiredService<AppDataPaths>().ErrorLogFile, [$"Game watcher error: {error}"])));
+            error => RecoveryLog.Append(provider.GetRequiredService<AppDataPaths>().ErrorLogFile, [error.ToString()], "Game watcher error"),
+            provider.GetRequiredService<PendingRecovery>()));
         services.AddSingleton(provider => new GameLauncher(
             provider.GetRequiredService<IGameProcess>(),
             provider.GetRequiredService<TransferGate>(),
@@ -82,7 +84,27 @@ public static class Composition
             provider.GetRequiredService<TimeProvider>()));
         services.AddSingleton<MirrorReplacer>();
         services.AddSingleton<LeftoverRecovery>();
+        services.AddSingleton(provider => new PendingRecovery(
+            provider.GetRequiredService<IGameProcess>(),
+            provider.GetRequiredService<TransferGate>(),
+            () => RecoverLeftovers(provider),
+            notes => RecoveryLog.Append(provider.GetRequiredService<AppDataPaths>().ErrorLogFile, notes)));
         services.AddSingleton<SaveReceiver>();
+    }
+
+    private static IReadOnlyList<string> RecoverLeftovers(IServiceProvider provider)
+    {
+        try
+        {
+            var settings = provider.GetRequiredService<SettingsSession>().Current;
+            var parentDir = SaveLocator.ParentDirectory(settings.GameDir, settings.SaveDir);
+            provider.GetRequiredService<BackupStore>().DeleteOrphanedParts();
+            return parentDir is null ? [] : provider.GetRequiredService<LeftoverRecovery>().Recover(parentDir);
+        }
+        catch (Exception failure)
+        {
+            return [$"Startup recovery failed: {failure.Message}"];
+        }
     }
 
     private static void AddUiServices(IServiceCollection services)

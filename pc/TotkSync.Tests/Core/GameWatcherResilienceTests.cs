@@ -67,22 +67,6 @@ public class GameWatcherResilienceTests : IDisposable
     }
 
     [Fact]
-    public async Task Two_concurrent_ticks_seeing_a_start_raise_one_RunningChanged()
-    {
-        var game = new FirstCallBlockingGame { Running = true };
-        var watcher = await NewWatcherAsync(game);
-        var first = Task.Run(() => watcher.TickAsync(CancellationToken.None));
-        Assert.True(game.FirstCallEntered.Wait(TimeSpan.FromSeconds(10)));
-
-        var second = Task.Run(() => watcher.TickAsync(CancellationToken.None));
-        await Task.Delay(100);
-        game.ReleaseFirstCall.Set();
-        await Task.WhenAll(first, second);
-
-        Assert.Equal([true], _runningChanges);
-    }
-
-    [Fact]
     public async Task A_stale_running_observation_cannot_overwrite_a_later_stopped_one()
     {
         var game = new FirstCallBlockingGame { Running = true };

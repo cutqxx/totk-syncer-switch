@@ -2,7 +2,6 @@ using TotkSync.Core.Display;
 using TotkSync.Core.Saves;
 using TotkSync.Core.Status;
 using TotkSync.Core.Sync;
-using Wpf.Ui.Controls;
 
 namespace TotkSync.App.Pages.Home;
 
@@ -42,21 +41,21 @@ public static class SaveCardPresenter
         {
             SyncStatus.InSync => new SaveCardModel
             {
-                Symbol = SymbolRegular.CheckmarkCircle20,
+                Icon = SaveCardIcon.CheckmarkCircle,
                 Tone = StatusTone.Success,
                 Word = "In sync",
                 Detail = lastSyncText,
             },
             SyncStatus.PcHasNewProgress => new SaveCardModel
             {
-                Symbol = SymbolRegular.ArrowSync20,
+                Icon = SaveCardIcon.ArrowSync,
                 Tone = StatusTone.Attention,
                 Word = "PC has new progress",
                 Detail = $"{lastSyncText}\nUse \"Get from PC\" on Switch to continue there.",
             },
             _ => new SaveCardModel
             {
-                Symbol = SymbolRegular.Info20,
+                Icon = SaveCardIcon.Info,
                 Tone = StatusTone.Neutral,
                 Word = "Never synced",
                 Detail = "Use \"Send to PC\" or \"Get from PC\" on Switch.",
@@ -69,7 +68,7 @@ public static class SaveCardPresenter
         return new SaveCardModel
         {
             Kind = SaveCardKind.Several,
-            Symbol = SymbolRegular.Warning20,
+            Icon = SaveCardIcon.Warning,
             Tone = StatusTone.Caution,
             Word = "Several save folders found",
             Detail = "Choose which one TotK Save Sync should use.",
@@ -87,7 +86,7 @@ public static class SaveCardPresenter
         return new SaveCardModel
         {
             Kind = SaveCardKind.NotFound,
-            Symbol = SymbolRegular.Warning20,
+            Icon = SaveCardIcon.Warning,
             Tone = StatusTone.Caution,
             Word = "PC save not found",
             Detail = SaveLocator.NotFoundMessage,
@@ -99,7 +98,7 @@ public static class SaveCardPresenter
         return new SaveCardModel
         {
             Kind = SaveCardKind.GameRunning,
-            Symbol = SymbolRegular.Games20,
+            Icon = SaveCardIcon.Games,
             Tone = StatusTone.Neutral,
             Word = "TotK is running",
             Detail = "Save status updates after the game exits.",
@@ -111,7 +110,7 @@ public static class SaveCardPresenter
         return new SaveCardModel
         {
             Kind = SaveCardKind.Unreadable,
-            Symbol = SymbolRegular.Warning20,
+            Icon = SaveCardIcon.Warning,
             Tone = StatusTone.Caution,
             Word = "Couldn't read the PC save",
             Detail = unreadable.Reason,

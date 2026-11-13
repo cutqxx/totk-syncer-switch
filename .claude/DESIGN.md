@@ -177,6 +177,7 @@ Every status = **icon + status word + detail text**. Colour is only on the icon.
 | In sync | `CheckmarkCircle20` success | `In sync` | `Last sync: 2026-11-03 14:25, Switch -> PC` |
 | PC has new progress | `ArrowSync20` attention | `PC has new progress` | `Last sync: 2026-11-03 12:00, Switch -> PC` / `Use "Get from PC" on Switch to continue there.` |
 | Never synced | `Info20` neutral | `Never synced` | `Use "Send to PC" or "Get from PC" on Switch.` |
+| Game running (no save read yet) | `Games20` neutral | `TotK is running` | `Save status updates after the game exits.` |
 | Receiving | ProgressRing | `Receiving save from Switch…` | `Don't start the game until this finishes.` |
 | Sending (Phase 2) | ProgressRing | `Sending save to Switch…` | (none) |
 | Not found | `Warning20` caution | `PC save not found` | `PC save not found: start TotK on PC once or set save folder in Settings` + button `Open Settings` |
@@ -532,7 +533,7 @@ Windows 11 Settings pattern: section headers (BodyStrong) + `ui:CardControl` row
 | Hero title | `Tears of the Kingdom` |
 | Play | `Play` / `Starting…` / `TotK is running` / `Waiting…` |
 | Play captions | `Sync is paused until you close the game.` / `Waiting for save transfer to finish. The game starts automatically.` / `Choose the game folder first.` / `Starting the game once creates the PC save.` |
-| PC save card | `PC save`, `In sync`, `PC has new progress`, `Never synced`, `Receiving save from Switch…`, `Sending save to Switch…`, `PC save not found`, `Several save folders found`, `Use this folder`, `Open Settings` |
+| PC save card | `PC save`, `In sync`, `PC has new progress`, `Never synced`, `TotK is running`, `Save status updates after the game exits.`, `Receiving save from Switch…`, `Sending save to Switch…`, `PC save not found`, `Several save folders found`, `Use this folder`, `Open Settings` |
 | Field labels | `Folder`, `Modified`, `Files`, `Fingerprint`, `Address for Switch`, `Token` |
 | Sync detail | `Last sync: <yyyy-MM-dd HH:mm>, Switch -> PC` / `…, PC -> Switch` / `Use "Get from PC" on Switch to continue there.` / `Use "Send to PC" or "Get from PC" on Switch.` |
 | Not found (AC) | `PC save not found: start TotK on PC once or set save folder in Settings` |

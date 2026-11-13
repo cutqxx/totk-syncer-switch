@@ -17,7 +17,8 @@ public sealed class SaveReceiver(
     BackupStore backups,
     MirrorReplacer replacer,
     SyncStateStore syncState,
-    TimeProvider time)
+    TimeProvider time,
+    PendingRecovery? recovery = null)
 {
     public const string UploadInterrupted = "upload interrupted";
     public const string SeveralSaves = "several save folders found: choose one in Settings";
@@ -35,6 +36,7 @@ public sealed class SaveReceiver(
         }
         using (lease)
         {
+            recovery?.RunHoldingGate();
             return await ReceiveHoldingGateAsync(request, ct);
         }
     }

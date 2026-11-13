@@ -1,5 +1,3 @@
-using Wpf.Ui.Controls;
-
 namespace TotkSync.App.Pages.Home;
 
 public enum SaveCardKind
@@ -10,6 +8,16 @@ public enum SaveCardKind
     Several,
     Unreadable,
     GameRunning,
+}
+
+public enum SaveCardIcon
+{
+    None,
+    CheckmarkCircle,
+    ArrowSync,
+    Info,
+    Warning,
+    Games,
 }
 
 public enum StatusTone
@@ -29,7 +37,7 @@ public sealed record SaveCardModel
 
     public SaveCardKind Kind { get; init; } = SaveCardKind.None;
 
-    public SymbolRegular Symbol { get; init; } = SymbolRegular.Empty;
+    public SaveCardIcon Icon { get; init; } = SaveCardIcon.None;
 
     public StatusTone Tone { get; init; } = StatusTone.Neutral;
 

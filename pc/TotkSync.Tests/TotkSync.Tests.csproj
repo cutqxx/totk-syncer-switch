@@ -22,6 +22,7 @@
     <Compile Include="..\TotkSync.App\Pages\Home\PlayCardModel.cs" LinkBase="App" />
     <Compile Include="..\TotkSync.App\Pages\Home\SaveCardPresenter.cs" LinkBase="App" />
     <Compile Include="..\TotkSync.App\Pages\Home\SaveCardModel.cs" LinkBase="App" />
+    <Compile Include="..\TotkSync.App\Services\RecoveryLog.cs" LinkBase="App" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

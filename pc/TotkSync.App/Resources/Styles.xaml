@@ -1,10 +1,12 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-                    xmlns:controls="clr-namespace:TotkSync.App.Controls">
+                    xmlns:controls="clr-namespace:TotkSync.App.Controls"
+                    xmlns:home="clr-namespace:TotkSync.App.Pages.Home">
 
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     <controls:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibility" />
+    <home:SaveCardIconConverter x:Key="SaveCardIconToSymbol" />
 
     <Style x:Key="CaptionText" TargetType="{x:Type ui:TextBlock}">
         <Setter Property="FontTypography" Value="Caption" />

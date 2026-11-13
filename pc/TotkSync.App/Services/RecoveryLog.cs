@@ -4,7 +4,7 @@ namespace TotkSync.App.Services;
 
 public static class RecoveryLog
 {
-    public static void Append(string logPath, IReadOnlyList<string> notes)
+    public static void Append(string logPath, IReadOnlyList<string> notes, string title = "Startup recovery")
     {
         if (notes.Count == 0)
         {
@@ -13,7 +13,7 @@ public static class RecoveryLog
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
-            File.AppendAllText(logPath, $"{DateTimeOffset.Now:O}\nStartup recovery:\n{string.Join('\n', notes)}\n\n");
+            File.AppendAllText(logPath, $"{DateTimeOffset.Now:O}\n{title}:\n{string.Join('\n', notes)}\n\n");
         }
         catch (Exception failure) when (failure is IOException or UnauthorizedAccessException)
         {

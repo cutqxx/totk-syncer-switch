@@ -1,3 +1,4 @@
+using TotkSync.Core.Replace;
 using TotkSync.Core.Status;
 using TotkSync.Core.Sync;
 
@@ -8,13 +9,15 @@ public sealed class GameWatcher(
     TransferGate gate,
     SaveStatusCache cache,
     TimeProvider time,
-    Action<Exception>? onError = null) : IDisposable
+    Action<Exception>? onError = null,
+    PendingRecovery? recovery = null) : IDisposable
 {
     public static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
 
     private readonly CancellationTokenSource _stop = new();
     private readonly SemaphoreSlim _tickLock = new(1, 1);
     private volatile bool _wasRunning;
+    private string? _lastErrorMessage;
 
     public bool IsRunning => _wasRunning;
 
@@ -47,11 +50,22 @@ public sealed class GameWatcher(
         try
         {
             await TickAsync(ct);
+            _lastErrorMessage = null;
         }
-        catch (Exception error) when (error is not OperationCanceledException)
+        catch (Exception error) when (!ct.IsCancellationRequested)
         {
-            onError?.Invoke(error);
+            ReportOnce(error);
         }
+    }
+
+    private void ReportOnce(Exception error)
+    {
+        if (error.Message == _lastErrorMessage)
+        {
+            return;
+        }
+        _lastErrorMessage = error.Message;
+        onError?.Invoke(error);
     }
 
     public async Task TickAsync(CancellationToken ct)
@@ -70,17 +84,19 @@ public sealed class GameWatcher(
     private async Task ObserveAsync(CancellationToken ct)
     {
         var isRunning = game.IsRunning();
-        if (isRunning == _wasRunning)
-        {
-            return;
-        }
+        var isTransition = isRunning != _wasRunning;
         _wasRunning = isRunning;
-        RunningChanged?.Invoke(isRunning);
-        if (!isRunning)
+        if (isTransition)
+        {
+            RunningChanged?.Invoke(isRunning);
+        }
+        if (!isRunning && (isTransition || HasWorkDeferredByGame))
         {
             await ReportNewProgressAsync(ct);
         }
     }
+
+    private bool HasWorkDeferredByGame => recovery?.IsPending == true || cache.Current is SaveStatus.GameRunning;
 
     private async Task ReportNewProgressAsync(CancellationToken ct)
     {
@@ -90,6 +106,7 @@ public sealed class GameWatcher(
             {
                 return;
             }
+            recovery?.RunHoldingGate();
             await cache.RefreshAsync();
         }
         if (cache.Current is SaveStatus.Found { Sync: SyncStatus.PcHasNewProgress })

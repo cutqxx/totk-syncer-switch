@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TotkSync.App.Pages.Activity;
 using TotkSync.App.Services;
 using TotkSync.Core.Backups;
+using TotkSync.Core.Game;
 using TotkSync.Core.Replace;
 using TotkSync.Core.Saves;
 using TotkSync.Core.Settings;
@@ -52,6 +53,7 @@ public partial class App : Application
         services.GetRequiredService<MainWindow>().Show();
         await services.GetRequiredService<SaveStatusCache>().RefreshAsync();
         await services.GetRequiredService<ServerHost>().StartAsync();
+        _ = services.GetRequiredService<GameWatcher>().Start();
         await activityLoad;
     }
 

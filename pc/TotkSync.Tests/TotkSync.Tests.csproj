@@ -18,6 +18,10 @@
     <!-- Presenter logic that lives in the WPF app but does not use WPF: compiled in here so it is testable on plain net10.0. -->
     <Compile Include="..\TotkSync.App\Pages\Backups\BackupPresenter.cs" LinkBase="App" />
     <Compile Include="..\TotkSync.App\Pages\Backups\BackupRowModel.cs" LinkBase="App" />
+    <Compile Include="..\TotkSync.App\Pages\Home\PlayCardPresenter.cs" LinkBase="App" />
+    <Compile Include="..\TotkSync.App\Pages\Home\PlayCardModel.cs" LinkBase="App" />
+    <Compile Include="..\TotkSync.App\Pages\Home\SaveCardPresenter.cs" LinkBase="App" />
+    <Compile Include="..\TotkSync.App\Pages\Home\SaveCardModel.cs" LinkBase="App" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

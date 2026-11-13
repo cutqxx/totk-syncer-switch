@@ -21,7 +21,8 @@ public sealed partial class HomeViewModel : ObservableObject
         FolderPicker picker,
         ShellOpener shell,
         Navigator navigator,
-        ServerCardViewModel serverCard)
+        ServerCardViewModel serverCard,
+        PlayCardViewModel playCard)
     {
         _settings = settings;
         _cache = cache;
@@ -29,6 +30,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _shell = shell;
         _navigator = navigator;
         ServerCard = serverCard;
+        PlayCard = playCard;
         Card = SaveCardModel.Empty;
         GameFolderError = "";
         SaveFolderError = "";
@@ -41,6 +43,8 @@ public sealed partial class HomeViewModel : ObservableObject
     public event Action? GameFolderRejected;
 
     public ServerCardViewModel ServerCard { get; }
+
+    public PlayCardViewModel PlayCard { get; }
 
     [ObservableProperty]
     public partial SaveCardModel Card { get; set; }

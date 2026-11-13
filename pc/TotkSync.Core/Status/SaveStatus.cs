@@ -13,6 +13,8 @@ public abstract record SaveStatus
 
     public sealed record NotFound : SaveStatus;
 
+    public sealed record GameRunning : SaveStatus;
+
     public sealed record Several(IReadOnlyList<SaveCandidate> Items) : SaveStatus;
 
     public sealed record Found(SaveSnapshot Snapshot, LastSync? LastSync) : SaveStatus

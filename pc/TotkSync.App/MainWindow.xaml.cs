@@ -1,8 +1,9 @@
 using System.ComponentModel;
 using System.Windows;
+using TotkSync.App.Dialogs;
 using TotkSync.App.Pages.Home;
 using TotkSync.App.Services;
-using TotkSync.Server;
+using TotkSync.Core.Sync;
 using Wpf.Ui;
 using Wpf.Ui.Animations;
 using Wpf.Ui.Appearance;
@@ -12,18 +13,20 @@ namespace TotkSync.App;
 
 public partial class MainWindow : FluentWindow
 {
-    private readonly ServerHost _server;
+    private readonly LauncherShutdown _shutdown;
+    private readonly IContentDialogService _dialogs;
     private bool _isClosing;
     private bool _isServerStopped;
 
     public MainWindow(
         IServiceProvider services,
         Navigator navigator,
-        ServerHost server,
+        LauncherShutdown shutdown,
         IContentDialogService dialogs,
         ISnackbarService snackbar)
     {
-        _server = server;
+        _shutdown = shutdown;
+        _dialogs = dialogs;
         InitializeComponent();
         SystemThemeWatcher.Watch(this);
         dialogs.SetDialogHost(RootContentDialog);
@@ -47,9 +50,20 @@ public partial class MainWindow : FluentWindow
             return;
         }
         _isClosing = true;
-        await _server.StopAsync();
+        await ShutdownShowingProgressAsync();
         _isServerStopped = true;
         Close();
+    }
+
+    private async Task ShutdownShowingProgressAsync()
+    {
+        FinishingTransferDialog? dialog = null;
+        await _shutdown.ShutdownAsync(() =>
+        {
+            dialog = new FinishingTransferDialog(_dialogs.GetDialogHostEx());
+            _ = dialog.ShowAsync();
+        });
+        dialog?.Hide();
     }
 
     private void DisableTransitionsWhenWindowsAnimationsAreOff()

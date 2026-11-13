@@ -9,6 +9,7 @@ public enum SaveCardKind
     NotFound,
     Several,
     Unreadable,
+    GameRunning,
 }
 
 public enum StatusTone

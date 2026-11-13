@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using TotkSync.App.Pages.Activity;
@@ -41,6 +42,7 @@ public static class Composition
         services.AddSingleton<IGameProcess, GameProcess>();
         services.AddSingleton<StatusQuery>();
         services.AddSingleton(new ActivityLog(paths.ActivityFile));
+        AddGame(services);
         AddSaveReceiving(services, paths);
         services.AddSingleton(provider => new ServerHost(
             provider.GetRequiredService<SettingsSession>(),
@@ -50,6 +52,24 @@ public static class Composition
             IPAddress.Any,
             LanAddresses.Detect,
             provider.GetRequiredService<SaveReceiver>()));
+    }
+
+    private static void AddGame(IServiceCollection services)
+    {
+        services.AddSingleton(provider => new GameWatcher(
+            provider.GetRequiredService<IGameProcess>(),
+            provider.GetRequiredService<TransferGate>(),
+            provider.GetRequiredService<SaveStatusCache>(),
+            provider.GetRequiredService<TimeProvider>(),
+            error => RecoveryLog.Append(provider.GetRequiredService<AppDataPaths>().ErrorLogFile, [$"Game watcher error: {error}"])));
+        services.AddSingleton(provider => new GameLauncher(
+            provider.GetRequiredService<IGameProcess>(),
+            provider.GetRequiredService<TransferGate>(),
+            info => Process.Start(info)?.Dispose()));
+        services.AddSingleton(provider => new LauncherShutdown(
+            provider.GetRequiredService<TransferGate>(),
+            provider.GetRequiredService<ServerHost>().StopAsync,
+            provider.GetRequiredService<GameLauncher>().CancelPendingAndRefuseNew));
     }
 
     private static void AddSaveReceiving(IServiceCollection services, AppDataPaths paths)
@@ -84,6 +104,7 @@ public static class Composition
     {
         services.AddSingleton<PairingViewModel>();
         services.AddSingleton<ServerCardViewModel>();
+        services.AddSingleton<PlayCardViewModel>();
         services.AddSingleton<HomeViewModel>();
         services.AddSingleton<HomePage>();
         services.AddSingleton<SettingsViewModel>();

@@ -1,0 +1,17 @@
+<ui:ContentDialog x:Class="TotkSync.App.Dialogs.FinishingTransferDialog"
+                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                  Title="Finishing save transfer"
+                  DialogMaxWidth="480"
+                  IsFooterVisible="False">
+    <StackPanel>
+        <TextBlock Text="TotK Save Sync will close when the save is fully written. This takes a few seconds."
+                   TextWrapping="Wrap" />
+        <ui:ProgressRing Width="24"
+                         Height="24"
+                         Margin="{StaticResource Space.TopM}"
+                         HorizontalAlignment="Left"
+                         IsIndeterminate="True" />
+    </StackPanel>
+</ui:ContentDialog>

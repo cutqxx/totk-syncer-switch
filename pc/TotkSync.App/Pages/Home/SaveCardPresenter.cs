@@ -16,6 +16,7 @@ public static class SaveCardPresenter
             SaveStatus.Several several => FromSeveral(several),
             SaveStatus.NotFound => FromNotFound(),
             SaveStatus.Unreadable unreadable => FromUnreadable(unreadable),
+            SaveStatus.GameRunning => FromGameRunning(),
             _ => SaveCardModel.Empty,
         };
     }
@@ -90,6 +91,18 @@ public static class SaveCardPresenter
             Tone = StatusTone.Caution,
             Word = "PC save not found",
             Detail = SaveLocator.NotFoundMessage,
+        };
+    }
+
+    private static SaveCardModel FromGameRunning()
+    {
+        return new SaveCardModel
+        {
+            Kind = SaveCardKind.GameRunning,
+            Symbol = SymbolRegular.Games20,
+            Tone = StatusTone.Neutral,
+            Word = "TotK is running",
+            Detail = "Save status updates after the game exits.",
         };
     }
 

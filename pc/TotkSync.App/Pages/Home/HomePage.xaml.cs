@@ -9,5 +9,6 @@ public partial class HomePage : Page
         DataContext = viewModel;
         InitializeComponent();
         viewModel.GameFolderRejected += () => ChooseFolderButton.Focus();
+        Loaded += (_, _) => PlayCardHost.FocusPlayWhenEnabled();
     }
 }

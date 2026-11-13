@@ -1,0 +1,59 @@
+<UserControl x:Class="TotkSync.App.Pages.Home.PlayCardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:home="clr-namespace:TotkSync.App.Pages.Home"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             Focusable="False">
+    <ui:Card Padding="{StaticResource Space.HeroPadding}">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Margin="{StaticResource Space.RightM}" VerticalAlignment="Center">
+                <ui:TextBlock FontTypography="Subtitle" Text="Tears of the Kingdom" />
+                <TextBlock Margin="{StaticResource Space.TopXS}"
+                           AutomationProperties.Name="Game folder"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Style="{StaticResource MachineValueText}"
+                           Text="{Binding GameDir}"
+                           ToolTip="{Binding GameDir}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                <ui:Button x:Name="PlayButton"
+                           MinWidth="200"
+                           MinHeight="56"
+                           HorizontalAlignment="Stretch"
+                           Appearance="Primary"
+                           Command="{Binding PlayCommand}"
+                           IsEnabled="{Binding Card.IsEnabled}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon FontSize="24"
+                                       Symbol="Play24"
+                                       Visibility="{Binding Card.IsPlayIcon, Converter={StaticResource BoolToVisibility}}" />
+                        <ui:SymbolIcon FontSize="24"
+                                       Symbol="Games24"
+                                       Visibility="{Binding Card.IsGameRunningIcon, Converter={StaticResource BoolToVisibility}}" />
+                        <ui:ProgressRing Width="20"
+                                         Height="20"
+                                         IsIndeterminate="True"
+                                         Visibility="{Binding Card.IsSpinner, Converter={StaticResource BoolToVisibility}}" />
+                        <AccessText Margin="{StaticResource Space.LeftS}"
+                                    VerticalAlignment="Center"
+                                    FontWeight="SemiBold"
+                                    Text="{Binding Card.AccessLabel}" />
+                    </StackPanel>
+                </ui:Button>
+                <TextBlock Margin="{StaticResource Space.TopS}"
+                           MaxWidth="280"
+                           AutomationProperties.LiveSetting="Polite"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Text="{Binding Card.Caption}"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding Card.HasCaption, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
+        </Grid>
+    </ui:Card>
+</UserControl>

@@ -40,7 +40,7 @@ public sealed class ReplaceFailureSweepTests(ITestOutputHelper output)
 
     private static ValidatedSaveZip NewSave => ZipBuilder.Unwrap(SaveZipValidator.Validate(ZipBytes));
 
-    private static PushRequest Push() => new(ZipBytes.Length, _ => Task.FromResult(ZipBytes));
+    private static PushRequest Push() => new(ZipBytes.Length, _ => Task.FromResult(ZipBytes), IsForced: true);
 
     [Theory]
     [MemberData(nameof(ReplacerSingleFaults))]

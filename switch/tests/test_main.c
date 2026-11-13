@@ -21,6 +21,7 @@ void run_redact_tests(void);
 void run_retry_tests(void);
 void run_save_pack_tests(void);
 void run_save_rules_tests(void);
+void run_send_conflict_tests(void);
 void run_send_to_pc_tests(void);
 void run_text_and_repo_rule_tests(void);
 void run_zip_writer_tests(void);
@@ -45,6 +46,7 @@ int main(void)
     run_zip_writer_tests();
     run_save_pack_tests();
     run_send_to_pc_tests();
+    run_send_conflict_tests();
     run_text_and_repo_rule_tests();
     printf("%d checks, %d failures\n", ts_checks, ts_failures);
     return ts_failures == 0 ? 0 : 1;

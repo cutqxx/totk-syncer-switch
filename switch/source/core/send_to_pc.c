@@ -75,6 +75,7 @@ void send_describe_put(const api_put_result_t *put, const config_t *cfg, char *o
 {
     switch (put->kind) {
     case API_PUT_REPLACED: snprintf(out, out_size, TXT_RESULT_SENT, put->backup); break;
+    case API_PUT_UNCHANGED: snprintf(out, out_size, "%s", TXT_RESULT_UNCHANGED); break;
     case API_PUT_UNREACHABLE:
     case API_PUT_NETWORK_ERROR: describe_network_failure(put, out, out_size); break;
     case API_PUT_WRONG_TOKEN: snprintf(out, out_size, "%s", TXT_MSG_WRONG_TOKEN); break;
@@ -89,6 +90,12 @@ void send_describe_put(const api_put_result_t *put, const config_t *cfg, char *o
     default: snprintf(out, out_size, TXT_MSG_HTTP_ERROR, put->http_code); break;
     }
     redact_secret_inplace(out, cfg->token);
+}
+
+void send_format_conflict_prompt(const api_put_result_t *put, char *out, size_t out_size)
+{
+    const char *last_sync = put->last_sync_at[0] != '\0' ? put->last_sync_at : TXT_LAST_SYNC_NEVER;
+    snprintf(out, out_size, TXT_PROMPT_OVERWRITE, put->pc_modified, last_sync);
 }
 
 void send_format_transfer_note(const pack_stats_t *stats, const http_response_t *resp, char *out, size_t out_size)
@@ -166,6 +173,8 @@ static void record_put_result(send_context_t *ctx, const api_put_result_t *put)
     if (put->kind == API_PUT_REPLACED) {
         result->kind = SEND_OK;
         snprintf(result->backup, sizeof result->backup, "%s", put->backup);
+    } else if (put->kind == API_PUT_UNCHANGED) {
+        result->kind = SEND_UNCHANGED;
     } else if (put->kind == API_PUT_UNREACHABLE || put->kind == API_PUT_NETWORK_ERROR) {
         result->kind = SEND_NETWORK_FAILED;
     } else {
@@ -173,20 +182,43 @@ static void record_put_result(send_context_t *ctx, const api_put_result_t *put)
     }
 }
 
-static void upload_zip(send_context_t *ctx, const body_t *zip, const pack_stats_t *stats)
+static void put_zip(send_context_t *ctx, const body_t *zip, const pack_stats_t *stats, bool is_forced, api_put_result_t *put)
 {
     http_request_t request;
     http_response_t response;
-    api_put_result_t put;
     char note[TS_LINE_SIZE];
-    api_build_put_request(ctx->cfg, zip, &request);
+    if (is_forced) {
+        api_build_forced_put_request(ctx->cfg, zip, &request);
+    } else {
+        api_build_put_request(ctx->cfg, zip, &request);
+    }
     show(ctx->env, TXT_STEP_SENDING, to_kb(zip->size));
     show(ctx->env, "%s", TXT_STEP_WAIT);
     retry_perform_unsent(ctx->env, &request, &response);
     send_format_transfer_note(stats, &response, note, sizeof note);
     env_log_note(ctx->env, note);
-    api_interpret_put(&response, &put);
+    api_interpret_put(&response, put);
     http_response_free(&response);
+}
+
+static bool user_agrees_to_overwrite(send_context_t *ctx, const api_put_result_t *conflict)
+{
+    char prompt[TS_LINE_SIZE];
+    send_format_conflict_prompt(conflict, prompt, sizeof prompt);
+    return ctx->env->ui->confirm(ctx->env->ui->ctx, prompt);
+}
+
+static void upload_zip(send_context_t *ctx, const body_t *zip, const pack_stats_t *stats)
+{
+    api_put_result_t put;
+    put_zip(ctx, zip, stats, false, &put);
+    if (put.kind == API_PUT_CONFLICT) {
+        if (!user_agrees_to_overwrite(ctx, &put)) {
+            fail(ctx, SEND_CANCELLED, "%s", TXT_MSG_SEND_CANCELLED);
+            return;
+        }
+        put_zip(ctx, zip, stats, true, &put);
+    }
     record_put_result(ctx, &put);
 }
 

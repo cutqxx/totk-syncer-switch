@@ -20,14 +20,15 @@ public sealed class ReceiverRig : IDisposable
         Temp = temp;
         GameDir = settings.GameDir!;
         Settings = new SettingsSession(new SettingsStore(temp.Combine("settings.json")), settings);
-        Cache = new SaveStatusCache(Settings, new SaveStatusReader(new SyncStateStore(temp.Combine("state", "state.json"))));
+        SyncState = new SyncStateStore(temp.Combine("state", "state.json"));
+        Cache = new SaveStatusCache(Settings, new SaveStatusReader(SyncState));
         Query = new StatusQuery(Cache, Game);
         Time = new FakeTimeProvider(FakeNow);
         Ops = new FaultyFileOps(new FileOps());
         BackupsDir = temp.Combine("backups");
         Backups = new BackupStore(BackupsDir, Ops, Time);
         Replacer = new MirrorReplacer(Ops, Game, SwapRetry.None);
-        Receiver = new SaveReceiver(Settings, Game, Gate, Cache, Backups, Replacer);
+        Receiver = new SaveReceiver(Settings, Game, Gate, Cache, Backups, Replacer, SyncState, Time);
     }
 
     public TempDir Temp { get; }
@@ -45,6 +46,8 @@ public sealed class ReceiverRig : IDisposable
     public TransferGate Gate { get; } = new();
 
     public SettingsSession Settings { get; }
+
+    public SyncStateStore SyncState { get; }
 
     public SaveStatusCache Cache { get; }
 

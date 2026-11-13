@@ -180,7 +180,6 @@ static void a_200_body_that_is_not_a_replaced_result_is_an_unexpected_answer(voi
         "[]",
         "\"replaced\"",
         "{}",
-        "{\"result\":\"unchanged\",\"fingerprint\":\"" CONTRACT_FINGERPRINT "\"}",
         "{\"result\":\"replaced\",\"fingerprint\":\"" CONTRACT_FINGERPRINT "\"}",
         "{\"result\":\"replaced\",\"backup\":\"" CONTRACT_BACKUP "\"}",
         "{\"result\":1,\"backup\":\"" CONTRACT_BACKUP "\",\"fingerprint\":\"" CONTRACT_FINGERPRINT "\"}",
@@ -560,6 +559,178 @@ static void every_user_text_is_plain_ascii(void)
     }
 }
 
+/* ---- force, unchanged and conflict ---- */
+
+static void a_forced_put_request_goes_to_save_with_force_1_and_is_otherwise_the_normal_request(void)
+{
+    config_t cfg;
+    http_request_t normal;
+    http_request_t forced;
+    body_t zip = { NULL, 1000 };
+    test_make_config(&cfg);
+    api_build_put_request(&cfg, &zip, &normal);
+    api_build_forced_put_request(&cfg, &zip, &forced);
+    CHECK_INT_EQ(forced.method, HTTP_PUT);
+    CHECK_STR_EQ(forced.url, "http://192.168.1.10:8765/save?force=1");
+    CHECK_INT_EQ(forced.header_count, normal.header_count);
+    for (int i = 0; i < forced.header_count; i++) {
+        CHECK_STR_EQ(forced.headers[i], normal.headers[i]);
+    }
+    CHECK(forced.body == &zip);
+    CHECK_INT_EQ(forced.total_timeout_s, normal.total_timeout_s);
+    CHECK_INT_EQ(forced.expect_100_timeout_ms, normal.expect_100_timeout_ms);
+    CHECK_INT_EQ(forced.connect_timeout_s, normal.connect_timeout_s);
+}
+
+static void a_plain_put_request_never_carries_force(void)
+{
+    config_t cfg;
+    http_request_t req;
+    body_t zip = { NULL, 0 };
+    test_make_config(&cfg);
+    api_build_put_request(&cfg, &zip, &req);
+    CHECK(strstr(req.url, "force") == NULL);
+}
+
+static void an_unchanged_answer_is_read_from_the_contract_body(void)
+{
+    api_put_result_t put = interpret_contract("put-unchanged.json", 200, 0, LAUNCHER_MARKER_HEADERS, 5000);
+    CHECK_INT_EQ(put.kind, API_PUT_UNCHANGED);
+    CHECK_STR_EQ(put.fingerprint, CONTRACT_FINGERPRINT);
+    CHECK(put.backup[0] == '\0');
+    CHECK_INT_EQ(put.http_code, 200);
+}
+
+static void an_unchanged_answer_without_a_valid_fingerprint_is_an_unexpected_answer(void)
+{
+    static const char *const bodies[] = {
+        "{\"result\":\"unchanged\"}",
+        "{\"result\":\"unchanged\",\"fingerprint\":\"sha256:abc\"}",
+        "{\"result\":\"unchanged\",\"fingerprint\":5}",
+        "{\"result\":\"unchanged\",\"fingerprint\":\"sha256:E19ED4007A1FCDCC231A1C9BB8E9F73753913C0DB5328AFC635F94C12F6F4A5E\"}",
+        "{\"result\":\"Unchanged\",\"fingerprint\":\"" CONTRACT_FINGERPRINT "\"}",
+    };
+    for (size_t i = 0; i < sizeof bodies / sizeof bodies[0]; i++) {
+        api_put_result_t put = interpret_text(200, 0, LAUNCHER_MARKER_HEADERS, bodies[i], 100);
+        CHECK_INT_EQ(put.kind, API_PUT_BAD_RESPONSE);
+    }
+}
+
+static void an_unchanged_answer_without_the_marker_is_not_a_launcher(void)
+{
+    api_put_result_t put = interpret_contract("put-unchanged.json", 200, 0, NO_MARKER_HEADERS, 0);
+    CHECK_INT_EQ(put.kind, API_PUT_NOT_LAUNCHER);
+}
+
+static void a_conflict_answer_carries_both_dates_without_seconds_and_zone(void)
+{
+    api_put_result_t put = interpret_contract("error-conflict.json", 409, 0, LAUNCHER_MARKER_HEADERS, 5000);
+    CHECK_INT_EQ(put.kind, API_PUT_CONFLICT);
+    CHECK_STR_EQ(put.pc_modified, "2026-11-03 14:25");
+    CHECK_STR_EQ(put.last_sync_at, "2026-11-03 12:00");
+    CHECK_INT_EQ(put.http_code, 409);
+}
+
+static void a_conflict_answer_for_a_never_synced_pc_has_an_empty_last_sync(void)
+{
+    api_put_result_t put = interpret_contract("error-conflict-never-synced.json", 409, 0, LAUNCHER_MARKER_HEADERS, 5000);
+    CHECK_INT_EQ(put.kind, API_PUT_CONFLICT);
+    CHECK_STR_EQ(put.pc_modified, "2026-11-03 14:25");
+    CHECK(put.last_sync_at[0] == '\0');
+}
+
+static void a_conflict_answer_without_a_last_sync_key_counts_as_never_synced(void)
+{
+    api_put_result_t put = interpret_text(409, 0, LAUNCHER_MARKER_HEADERS,
+                                          "{\"error\":\"conflict\",\"pc_modified\":\"2026-11-03T14:25:01+03:00\"}", 100);
+    CHECK_INT_EQ(put.kind, API_PUT_CONFLICT);
+    CHECK(put.last_sync_at[0] == '\0');
+}
+
+static void a_conflict_refusal_that_arrived_before_the_connection_broke_is_still_a_conflict(void)
+{
+    api_put_result_t put = interpret_contract("error-conflict.json", 409, 56, LAUNCHER_MARKER_HEADERS, 300);
+    CHECK_INT_EQ(put.kind, API_PUT_CONFLICT);
+}
+
+static void a_409_that_is_not_a_well_formed_conflict_document_is_a_plain_http_error(void)
+{
+    static const char *const bodies[] = {
+        "",
+        "not json",
+        "{}",
+        "[]",
+        "{\"error\":\"conflict\"}",
+        "{\"error\":\"busy\",\"pc_modified\":\"2026-11-03T14:25:01+03:00\",\"last_sync_at\":null}",
+        "{\"error\":\"conflict\",\"pc_modified\":\"yesterday\",\"last_sync_at\":null}",
+        "{\"error\":\"conflict\",\"pc_modified\":5,\"last_sync_at\":null}",
+        "{\"error\":\"conflict\",\"pc_modified\":\"2026-11-03T14:25:01+03:00\",\"last_sync_at\":\"whenever\"}",
+        "{\"error\":\"conflict\",\"pc_modified\":\"2026-11-03T14:25:01+03:00\",\"last_sync_at\":7}",
+    };
+    for (size_t i = 0; i < sizeof bodies / sizeof bodies[0]; i++) {
+        api_put_result_t put = interpret_text(409, 0, LAUNCHER_MARKER_HEADERS, bodies[i], 100);
+        CHECK_INT_EQ(put.kind, API_PUT_HTTP_ERROR);
+        CHECK_INT_EQ(put.http_code, 409);
+    }
+}
+
+static void a_409_without_any_body_is_a_plain_http_error(void)
+{
+    api_put_result_t put = interpret_text(409, 0, LAUNCHER_MARKER_HEADERS, NULL, 100);
+    CHECK_INT_EQ(put.kind, API_PUT_HTTP_ERROR);
+}
+
+static void a_409_without_the_marker_is_not_a_launcher(void)
+{
+    api_put_result_t put = interpret_contract("error-conflict.json", 409, 0, NO_MARKER_HEADERS, 0);
+    CHECK_INT_EQ(put.kind, API_PUT_NOT_LAUNCHER);
+}
+
+static void the_unchanged_answer_has_the_exact_text_from_the_spec(void)
+{
+    char text[TS_LINE_SIZE];
+    api_put_result_t put = interpret_contract("put-unchanged.json", 200, 0, LAUNCHER_MARKER_HEADERS, 5000);
+    describe(&put, text, sizeof text);
+    CHECK_STR_EQ(text, "PC already has this save");
+}
+
+static void a_malformed_409_reads_as_pc_error_http_409(void)
+{
+    char text[TS_LINE_SIZE];
+    api_put_result_t put = interpret_text(409, 0, LAUNCHER_MARKER_HEADERS, "{}", 100);
+    describe(&put, text, sizeof text);
+    CHECK_STR_EQ(text, "PC error: HTTP 409");
+}
+
+static void the_overwrite_prompt_has_the_exact_text_from_the_spec_with_both_dates(void)
+{
+    char prompt[TS_LINE_SIZE];
+    api_put_result_t put = interpret_contract("error-conflict.json", 409, 0, LAUNCHER_MARKER_HEADERS, 0);
+    send_format_conflict_prompt(&put, prompt, sizeof prompt);
+    CHECK_STR_EQ(prompt, "PC save changed since last sync (PC: 2026-11-03 14:25, last sync: 2026-11-03 12:00). "
+                         "Overwrite PC save? A - yes, B - no");
+}
+
+static void the_overwrite_prompt_says_never_when_the_pc_has_no_last_sync(void)
+{
+    char prompt[TS_LINE_SIZE];
+    api_put_result_t put = interpret_contract("error-conflict-never-synced.json", 409, 0, LAUNCHER_MARKER_HEADERS, 0);
+    send_format_conflict_prompt(&put, prompt, sizeof prompt);
+    CHECK_STR_EQ(prompt, "PC save changed since last sync (PC: 2026-11-03 14:25, last sync: never). "
+                         "Overwrite PC save? A - yes, B - no");
+}
+
+static void the_overwrite_prompt_is_plain_ascii_and_stays_terminated_in_a_small_buffer(void)
+{
+    char prompt[TS_LINE_SIZE];
+    char small[16];
+    api_put_result_t put = interpret_contract("error-conflict.json", 409, 0, LAUNCHER_MARKER_HEADERS, 0);
+    send_format_conflict_prompt(&put, prompt, sizeof prompt);
+    CHECK(test_is_ascii_text(prompt));
+    send_format_conflict_prompt(&put, small, sizeof small);
+    CHECK_INT_EQ(strlen(small), sizeof small - 1);
+}
+
 void run_api_put_tests(void)
 {
     RUN_TEST(put_request_is_a_put_to_http_host_port_save);
@@ -606,4 +777,21 @@ void run_api_put_tests(void)
     RUN_TEST(a_failure_before_any_byte_was_sent_names_the_curl_code);
     RUN_TEST(the_token_never_reaches_any_user_text_even_when_the_pc_echoes_it);
     RUN_TEST(every_user_text_is_plain_ascii);
+    RUN_TEST(a_forced_put_request_goes_to_save_with_force_1_and_is_otherwise_the_normal_request);
+    RUN_TEST(a_plain_put_request_never_carries_force);
+    RUN_TEST(an_unchanged_answer_is_read_from_the_contract_body);
+    RUN_TEST(an_unchanged_answer_without_a_valid_fingerprint_is_an_unexpected_answer);
+    RUN_TEST(an_unchanged_answer_without_the_marker_is_not_a_launcher);
+    RUN_TEST(a_conflict_answer_carries_both_dates_without_seconds_and_zone);
+    RUN_TEST(a_conflict_answer_for_a_never_synced_pc_has_an_empty_last_sync);
+    RUN_TEST(a_conflict_answer_without_a_last_sync_key_counts_as_never_synced);
+    RUN_TEST(a_conflict_refusal_that_arrived_before_the_connection_broke_is_still_a_conflict);
+    RUN_TEST(a_409_that_is_not_a_well_formed_conflict_document_is_a_plain_http_error);
+    RUN_TEST(a_409_without_any_body_is_a_plain_http_error);
+    RUN_TEST(a_409_without_the_marker_is_not_a_launcher);
+    RUN_TEST(the_unchanged_answer_has_the_exact_text_from_the_spec);
+    RUN_TEST(a_malformed_409_reads_as_pc_error_http_409);
+    RUN_TEST(the_overwrite_prompt_has_the_exact_text_from_the_spec_with_both_dates);
+    RUN_TEST(the_overwrite_prompt_says_never_when_the_pc_has_no_last_sync);
+    RUN_TEST(the_overwrite_prompt_is_plain_ascii_and_stays_terminated_in_a_small_buffer);
 }

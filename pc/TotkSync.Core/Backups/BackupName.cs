@@ -3,12 +3,14 @@ using System.Text.RegularExpressions;
 
 namespace TotkSync.Core.Backups;
 
+public sealed record BackupInfo(DateTime LocalTime, string Kind);
+
 public static partial class BackupName
 {
     public const string PartSuffix = ".part";
 
-    private const string BeforeSwitchKind = "before-switch";
-    private const string RecoveredKind = "recovered";
+    public const string BeforeSwitchKind = "before-switch";
+    public const string RecoveredKind = "recovered";
 
     public static string BeforeSwitch(DateTimeOffset localTime) => Build(localTime, BeforeSwitchKind);
 
@@ -22,7 +24,19 @@ public static partial class BackupName
         return FirstFree(localTime, RecoveredKind, exists);
     }
 
-    public static bool IsBackup(string fileName) => BackupPattern().IsMatch(fileName);
+    public static BackupInfo? TryParse(string fileName)
+    {
+        var match = BackupPattern().Match(fileName);
+        if (!match.Success)
+        {
+            return null;
+        }
+        var stamp = match.Groups["stamp"].Value;
+        var isTime = DateTime.TryParseExact(stamp, "yyyyMMdd-HHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time);
+        return isTime ? new BackupInfo(time, match.Groups["kind"].Value) : null;
+    }
+
+    public static bool IsBackup(string fileName) => TryParse(fileName) is not null;
 
     public static bool IsPartial(string fileName)
     {
@@ -40,6 +54,6 @@ public static partial class BackupName
         return $"pc-{localTime.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)}-{kind}.zip";
     }
 
-    [GeneratedRegex(@"^pc-[0-9]{8}-[0-9]{6}-(before-switch|recovered)\.zip$")]
+    [GeneratedRegex(@"^pc-(?<stamp>[0-9]{8}-[0-9]{6})-(?<kind>before-switch|recovered)\.zip$")]
     private static partial Regex BackupPattern();
 }

@@ -66,7 +66,7 @@ public sealed class PutSaveEndpointTests : IAsyncLifetime
         }
     }
 
-    private HttpRequestMessage PutRequest(HttpContent content, string path = "/save", string? authorization = "Bearer " + FakeToken, bool expectContinue = false)
+    private HttpRequestMessage PutRequest(HttpContent content, string path = "/save?force=1", string? authorization = "Bearer " + FakeToken, bool expectContinue = false)
     {
         var request = new HttpRequestMessage(HttpMethod.Put, $"http://127.0.0.1:{_server.Port}{path}") { Content = content };
         if (authorization is not null)
@@ -77,7 +77,7 @@ public sealed class PutSaveEndpointTests : IAsyncLifetime
         return request;
     }
 
-    private Task<HttpResponseMessage> PutAsync(byte[] body, string path = "/save", string? authorization = "Bearer " + FakeToken)
+    private Task<HttpResponseMessage> PutAsync(byte[] body, string path = "/save?force=1", string? authorization = "Bearer " + FakeToken)
     {
         return _client.SendAsync(PutRequest(new ByteArrayContent(body), path, authorization));
     }
@@ -145,15 +145,6 @@ public sealed class PutSaveEndpointTests : IAsyncLifetime
         var entry = await SingleJournalEntryAsync();
 
         Assert.Equal(("PUT", "/save", 200, ActivityKind.SaveReplaced), (entry.Method, entry.Path, entry.StatusCode, entry.Kind));
-    }
-
-    [Fact]
-    public async Task Force_parameter_is_ignored_in_this_version_and_the_save_is_still_replaced()
-    {
-        using var response = await PutAsync(ValidZip, "/save?force=1");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(SaveTreeBuilder.ContractFingerprint, Fingerprint.OfDirectory(_rig.SaveDir));
     }
 
     [Fact]

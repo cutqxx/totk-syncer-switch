@@ -44,6 +44,10 @@ typedef struct {
     int choose_calls;
     int choose_offered;       /* account count shown to the last choose_account call */
     int choose_result;        /* what choose_account answers; -1 cancels */
+    int confirm_calls;
+    bool confirm_answer;      /* what confirm answers: true is A, false is B */
+    char confirm_prompt[TS_LINE_SIZE]; /* the prompt of the last confirm call */
+    char request_urls[MAX_RECORDED_LINES][TS_URL_SIZE]; /* the URL of every request, in order */
     int ui_line_count;
     char ui_lines[MAX_RECORDED_LINES][TS_LINE_SIZE];
     struct tm fixed_time;

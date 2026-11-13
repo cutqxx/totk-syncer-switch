@@ -20,9 +20,15 @@ public sealed record ReasonedErrorResponse(string Error, string Reason);
 
 public sealed record PutReplacedResponse(string Result, string Backup, string Fingerprint);
 
+public sealed record PutUnchangedResponse(string Result, string Fingerprint);
+
+public sealed record ConflictResponse(string Error, string PcModified, string? LastSyncAt);
+
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
 [JsonSerializable(typeof(StatusResponse))]
 [JsonSerializable(typeof(ErrorResponse))]
 [JsonSerializable(typeof(ReasonedErrorResponse))]
 [JsonSerializable(typeof(PutReplacedResponse))]
+[JsonSerializable(typeof(PutUnchangedResponse))]
+[JsonSerializable(typeof(ConflictResponse))]
 internal sealed partial class ApiJsonContext : JsonSerializerContext;

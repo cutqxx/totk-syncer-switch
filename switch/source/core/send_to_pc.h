@@ -11,10 +11,11 @@
 
 typedef enum {
     SEND_OK,                 /* the PC replaced its save; backup is set */
+    SEND_UNCHANGED,          /* the PC already had this exact save: nothing changed there */
     SEND_GAME_RUNNING,       /* TotK runs or is suspended on the Switch: nothing mounted, nothing sent */
     SEND_GAME_CHECK_FAILED,  /* the process check itself failed: handled like a running game */
     SEND_NO_SAVE_ON_CONSOLE,
-    SEND_CANCELLED,          /* the user left the account list */
+    SEND_CANCELLED,          /* the user left the account list, or refused to overwrite a changed PC save */
     SEND_MOUNT_FAILED,
     SEND_PACK_FAILED,        /* too large, too many entries, bad name, unreadable file, out of memory: nothing sent */
     SEND_NETWORK_FAILED,     /* no usable answer from the PC */
@@ -30,8 +31,12 @@ typedef struct {
 /* The "A - Send to PC" scenario. Steps are shown with ui->show_line; the console port only looks and reads.
    Order: check the game -> pick the account -> mount read-only -> pack -> unmount (always, before any network)
    -> PUT /save (retried once only when the connection could not be opened) -> result.
+   When the PC reports a conflict, ui->confirm asks whether to overwrite: A repeats the PUT with force, B sends nothing more.
    max_save_bytes is the limit on summed file sizes (TS_MAX_SAVE_BYTES in the app). */
 void send_to_pc(const sync_env_t *env, const config_t *cfg, int64_t max_save_bytes, send_result_t *out);
+
+/* The overwrite question for a PUT answered with API_PUT_CONFLICT. */
+void send_format_conflict_prompt(const api_put_result_t *put, char *out, size_t out_size);
 
 /* User text for a classified PUT answer (the success line included). The config token is removed from it. */
 void send_describe_put(const api_put_result_t *put, const config_t *cfg, char *out, size_t out_size);

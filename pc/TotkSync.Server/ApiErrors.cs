@@ -16,6 +16,7 @@ internal static class ApiErrors
     public const string GameRunning = "game_running";
     public const string Busy = "busy";
     public const string WriteFailed = "write_failed";
+    public const string Conflict = "conflict";
 
     public static Task WriteAsync(HttpContext context, int statusCode, string errorCode)
     {

@@ -46,6 +46,9 @@ static void fake_perform(void *ctx, const http_request_t *req, http_response_t *
     fake_world_t *world = ctx;
     int index = world->net_calls < world->reply_count ? world->net_calls : world->reply_count - 1;
     world->last_request = *req;
+    if (world->net_calls < MAX_RECORDED_LINES) {
+        snprintf(world->request_urls[world->net_calls], TS_URL_SIZE, "%s", req->url);
+    }
     world->net_calls++;
     if (req->body != NULL) {
         bool is_other_body = world->sent_body.data != NULL
@@ -92,6 +95,14 @@ static int fake_choose_account(void *ctx, const account_t *list, int count)
     return world->choose_result;
 }
 
+static bool fake_confirm(void *ctx, const char *prompt)
+{
+    fake_world_t *world = ctx;
+    world->confirm_calls++;
+    snprintf(world->confirm_prompt, sizeof world->confirm_prompt, "%s", prompt);
+    return world->confirm_answer;
+}
+
 void fake_world_init(fake_world_t *world, const scripted_reply_t *replies, int reply_count)
 {
     memset(world, 0, sizeof *world);
@@ -103,7 +114,8 @@ void fake_world_init(fake_world_t *world, const scripted_reply_t *replies, int r
     world->fixed_time.tm_hour = 12;
     world->net = (net_port_t){ .ctx = world, .perform = fake_perform };
     world->clock = (clock_port_t){ .ctx = world, .now_local = fake_now_local, .sleep_seconds = fake_sleep_seconds };
-    world->ui = (ui_port_t){ .ctx = world, .show_line = fake_show_line, .choose_account = fake_choose_account };
+    world->ui = (ui_port_t){ .ctx = world, .show_line = fake_show_line, .choose_account = fake_choose_account,
+                              .confirm = fake_confirm };
     world->choose_result = -1;
     world->env = (sync_env_t){ &world->net, &world->clock, &world->ui, NULL, NULL };
 }

@@ -88,6 +88,7 @@ public static class Composition
         services.AddSingleton<HomePage>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<SettingsPage>();
+        services.AddSingleton<BackupsViewModel>();
         services.AddSingleton<BackupsPage>();
         services.AddSingleton<ActivityViewModel>();
         services.AddSingleton<ActivityPage>();

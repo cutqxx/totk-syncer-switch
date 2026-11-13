@@ -10,6 +10,28 @@ public sealed class BackupStore(string dir, IFileOps ops, TimeProvider time)
 
     public BackupFile CreateRecovered(string saveDir) => Create(saveDir, BackupName.FirstFreeRecovered);
 
+    public IReadOnlyList<BackupEntry> List()
+    {
+        return ListBackupNames()
+            .Select(name => (Name: name, Info: BackupName.TryParse(name)))
+            .Where(item => item.Info is not null)
+            .Select(item => new BackupEntry(item.Name, item.Info!.LocalTime, item.Info.Kind, new FileInfo(Path.Combine(dir, item.Name)).Length))
+            .OrderByDescending(entry => entry.Name, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    public void PruneOldBackups(int keep, string justCreatedName)
+    {
+        try
+        {
+            ListObsoleteBackups(keep, justCreatedName).ForEach(name => DeleteQuietly(Path.Combine(dir, name)));
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // Rotation is housekeeping: the save is already replaced and must still be reported as replaced.
+        }
+    }
+
     public string? FindBackupOf(string fingerprint)
     {
         if (!Directory.Exists(dir))
@@ -33,6 +55,22 @@ public sealed class BackupStore(string dir, IFileOps ops, TimeProvider time)
         {
             // Orphaned .part files are harmless; the launcher must still start.
         }
+    }
+
+    private List<string> ListObsoleteBackups(int keep, string justCreatedName)
+    {
+        return ListBackupNames()
+            .Where(name => name != justCreatedName)
+            .OrderByDescending(name => name, StringComparer.Ordinal)
+            .Skip(Math.Max(keep - 1, 0))
+            .ToList();
+    }
+
+    private List<string> ListBackupNames()
+    {
+        return Directory.Exists(dir)
+            ? Directory.EnumerateFiles(dir).Select(Path.GetFileName).OfType<string>().Where(BackupName.IsBackup).ToList()
+            : [];
     }
 
     private List<string> ListOrphanedParts()

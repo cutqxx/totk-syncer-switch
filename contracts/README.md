@@ -67,14 +67,16 @@ Switch (`switch/source/core/config.c`) принимает этот файл ка
 
 ## PUT /save (слайс 1.5)
 
-Тело запроса: ZIP сейва как есть, `Content-Length` обязателен. Параметр `?force=1` в слайсе 1.5 игнорируется (конфликты появятся в 1.7).
+Тело запроса: ZIP сейва как есть, `Content-Length` обязателен. Параметр `?force=1` заменяет сейв ПК даже при конфликте (бэкап всё равно делается).
 Ответы (все с заголовком `X-TotkSync-Api: 1`):
 
 | Код | Файл | Когда |
 |---|---|---|
 | 200 | `api/put-replaced.json` | сейв заменён, в ответе имя бэкапа и отпечаток |
+| 200 | `api/put-unchanged.json` | отпечаток входящего сейва совпал с текущим сейвом ПК: бэкапа и замены нет, `last_sync` обновлён |
 | 400 | `api/error-invalid-zip.json` | ZIP нарушает правила; `reason` из `save-zip/cases.json` |
 | 404 | `api/error-no-save.json` | на ПК нет сейва (или `save_dir` указывает не на сейв) |
+| 409 | `api/error-conflict.json`, `api/error-conflict-never-synced.json` | сейв ПК изменился после последней синхронизации (или истории нет) и входящий сейв отличается; `last_sync_at` равен `null`, если истории нет. С `?force=1` конфликта нет |
 | 411 | `api/error-length-required.json` | нет `Content-Length` (в том числе chunked) |
 | 413 | `api/error-too-large.json` | `Content-Length` больше 64 МиБ |
 | 423 | `api/error-game-running.json` | запущен `totk.exe` |

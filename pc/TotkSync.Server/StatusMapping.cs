@@ -35,7 +35,7 @@ internal static class StatusMapping
             : new LastSyncDto(lastSync.Fingerprint, FormatDate(lastSync.At, time), lastSync.Direction);
     }
 
-    private static string FormatDate(DateTimeOffset value, TimeProvider time)
+    internal static string FormatDate(DateTimeOffset value, TimeProvider time)
     {
         return TimeZoneInfo.ConvertTime(value, time.LocalTimeZone).ToString(IsoSecondsFormat, CultureInfo.InvariantCulture);
     }

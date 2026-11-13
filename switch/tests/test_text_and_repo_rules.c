@@ -44,6 +44,7 @@ static void every_screen_and_log_string_is_printable_ascii(void)
         TXT_MSG_SAVE_TOO_LARGE, TXT_MSG_TOO_MANY_ENTRIES, TXT_MSG_BAD_ENTRY_NAME, TXT_MSG_SAVE_READ_FAILED, TXT_MSG_ZIP_FAILED,
         TXT_MSG_PC_REJECTED, TXT_MSG_PC_GAME_RUNNING, TXT_MSG_PC_BUSY, TXT_MSG_PC_NO_SAVE, TXT_MSG_PC_WRITE_FAILED,
         TXT_MSG_SEND_UNCERTAIN, TXT_MSG_BAD_PUT_RESPONSE,
+        TXT_RESULT_UNCHANGED, TXT_PROMPT_OVERWRITE, TXT_LAST_SYNC_NEVER,
     };
     for (size_t i = 0; i < sizeof strings / sizeof strings[0]; i++) {
         CHECK(test_is_ascii_text(strings[i]));

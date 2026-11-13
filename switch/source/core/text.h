@@ -32,6 +32,9 @@
 #define TXT_STEP_SENDING "Sending to PC... (%lld KB)"
 #define TXT_STEP_WAIT "Please wait: buttons and HOME do not respond until this ends"
 #define TXT_RESULT_SENT "SENT TO PC. PC backup: %s"
+#define TXT_RESULT_UNCHANGED "PC already has this save"
+#define TXT_PROMPT_OVERWRITE "PC save changed since last sync (PC: %s, last sync: %s). Overwrite PC save? A - yes, B - no"
+#define TXT_LAST_SYNC_NEVER "never"
 #define TXT_ACCOUNT_MENU_TITLE "Choose the account whose TotK save to send"
 #define TXT_ACCOUNT_MENU_BUTTONS "Up/Down - select    A - send    B - cancel"
 

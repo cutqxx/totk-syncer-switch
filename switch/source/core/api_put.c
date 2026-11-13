@@ -21,16 +21,26 @@ long api_put_timeout_s(int64_t zip_bytes)
     return (long)(total_s > TS_UPLOAD_MAX_TIMEOUT_S ? TS_UPLOAD_MAX_TIMEOUT_S : total_s);
 }
 
-void api_build_put_request(const config_t *cfg, const body_t *zip, http_request_t *out)
+static void build_put_request(const config_t *cfg, const body_t *zip, const char *path, http_request_t *out)
 {
     http_request_init(out, HTTP_PUT);
-    api_format_url(cfg, "/save", out->url, sizeof out->url);
+    api_format_url(cfg, path, out->url, sizeof out->url);
     api_add_authorization(out, cfg);
     http_request_add_header(out, CONTENT_TYPE_HEADER);
     http_request_add_header(out, EXPECT_HEADER);
     out->body = zip;
     out->total_timeout_s = api_put_timeout_s(zip->size);
     out->expect_100_timeout_ms = TS_EXPECT_100_TIMEOUT_MS;
+}
+
+void api_build_put_request(const config_t *cfg, const body_t *zip, http_request_t *out)
+{
+    build_put_request(cfg, zip, "/save", out);
+}
+
+void api_build_forced_put_request(const config_t *cfg, const body_t *zip, http_request_t *out)
+{
+    build_put_request(cfg, zip, "/save?force=1", out);
 }
 
 static const char *string_field(const cJSON *root, const char *name)
@@ -73,17 +83,23 @@ static bool is_backup_name(const char *text)
     return true;
 }
 
+static bool read_fingerprint(const cJSON *root, api_put_result_t *out)
+{
+    const char *fingerprint = string_field(root, "fingerprint");
+    if (fingerprint == NULL || !is_fingerprint(fingerprint)) {
+        return false;
+    }
+    snprintf(out->fingerprint, sizeof out->fingerprint, "%s", fingerprint);
+    return true;
+}
+
 static bool read_replaced_fields(const cJSON *root, api_put_result_t *out)
 {
-    const char *result = string_field(root, "result");
     const char *backup = string_field(root, "backup");
-    const char *fingerprint = string_field(root, "fingerprint");
-    if (result == NULL || strcmp(result, "replaced") != 0 || backup == NULL || !is_backup_name(backup)
-        || fingerprint == NULL || !is_fingerprint(fingerprint)) {
+    if (backup == NULL || !is_backup_name(backup) || !read_fingerprint(root, out)) {
         return false;
     }
     snprintf(out->backup, sizeof out->backup, "%s", backup);
-    snprintf(out->fingerprint, sizeof out->fingerprint, "%s", fingerprint);
     return true;
 }
 
@@ -95,12 +111,18 @@ static cJSON *parse_body(const http_response_t *resp)
     return cJSON_ParseWithLength((const char *)resp->body.data, (size_t)resp->body.size);
 }
 
-static api_put_kind_t interpret_replaced(const http_response_t *resp, api_put_result_t *out)
+static api_put_kind_t interpret_success(const http_response_t *resp, api_put_result_t *out)
 {
     cJSON *root = parse_body(resp);
-    bool is_valid = root != NULL && read_replaced_fields(root, out);
+    const char *result = root != NULL ? string_field(root, "result") : NULL;
+    api_put_kind_t kind = API_PUT_BAD_RESPONSE;
+    if (result != NULL && strcmp(result, "replaced") == 0 && read_replaced_fields(root, out)) {
+        kind = API_PUT_REPLACED;
+    } else if (result != NULL && strcmp(result, "unchanged") == 0 && read_fingerprint(root, out)) {
+        kind = API_PUT_UNCHANGED;
+    }
     cJSON_Delete(root);
-    return is_valid ? API_PUT_REPLACED : API_PUT_BAD_RESPONSE;
+    return kind;
 }
 
 static bool is_error_document(const cJSON *root, const char *error_name)
@@ -113,6 +135,27 @@ static void read_reason(const cJSON *root, api_put_result_t *out)
 {
     const char *reason = string_field(root, "reason");
     ascii_copy(reason != NULL ? reason : NO_DETAILS, out->reason, sizeof out->reason);
+}
+
+static bool read_conflict_fields(const cJSON *root, api_put_result_t *out)
+{
+    const char *pc_modified = string_field(root, "pc_modified");
+    const cJSON *last_sync_at = cJSON_GetObjectItemCaseSensitive(root, "last_sync_at");
+    if (pc_modified == NULL || !api_format_modified(pc_modified, out->pc_modified)) {
+        return false;
+    }
+    if (cJSON_IsString(last_sync_at)) {
+        return api_format_modified(last_sync_at->valuestring, out->last_sync_at);
+    }
+    return last_sync_at == NULL || cJSON_IsNull(last_sync_at);
+}
+
+static api_put_kind_t interpret_conflict(const http_response_t *resp, api_put_result_t *out)
+{
+    cJSON *root = parse_body(resp);
+    bool is_conflict = is_error_document(root, "conflict") && read_conflict_fields(root, out);
+    cJSON_Delete(root);
+    return is_conflict ? API_PUT_CONFLICT : API_PUT_HTTP_ERROR;
 }
 
 static bool carries_reason(api_put_kind_t kind)
@@ -135,11 +178,12 @@ static api_put_kind_t interpret_error_document(const http_response_t *resp, cons
 static api_put_kind_t interpret_launcher_answer(const http_response_t *resp, api_put_result_t *out)
 {
     switch (resp->http_code) {
-    case 200: return interpret_replaced(resp, out);
+    case 200: return interpret_success(resp, out);
     case 400: return interpret_error_document(resp, "invalid_zip", API_PUT_INVALID_ZIP, out);
     case 401: return API_PUT_WRONG_TOKEN;
     case 403: return API_PUT_FORBIDDEN;
     case 404: return interpret_error_document(resp, "no_save", API_PUT_NO_SAVE, out);
+    case 409: return interpret_conflict(resp, out);
     case 423: return API_PUT_GAME_RUNNING;
     case 500: return interpret_error_document(resp, "write_failed", API_PUT_WRITE_FAILED, out);
     case 503: return API_PUT_BUSY;

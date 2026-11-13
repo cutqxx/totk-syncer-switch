@@ -47,6 +47,24 @@ static int move_selection(int selected, int count, u64 pressed)
     return selected;
 }
 
+bool ui_confirm(void *ctx, const char *prompt)
+{
+    PadState *pad = ctx;
+    ui_show_line(NULL, prompt);
+    while (appletMainLoop()) {
+        padUpdate(pad);
+        u64 pressed = padGetButtonsDown(pad);
+        if (pressed & HidNpadButton_A) {
+            return true;
+        }
+        if (pressed & HidNpadButton_B) {
+            return false;
+        }
+        consoleUpdate(NULL);
+    }
+    return false;
+}
+
 int ui_choose_account(void *ctx, const account_t *list, int count)
 {
     PadState *pad = ctx;

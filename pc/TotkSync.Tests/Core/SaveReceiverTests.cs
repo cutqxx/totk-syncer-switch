@@ -32,9 +32,9 @@ public sealed class SaveReceiverTests : IAsyncLifetime
             return Task.FromResult(bytes);
         }
 
-        public PushRequest Request() => new(bytes.Length, ReadAsync);
+        public PushRequest Request() => new(bytes.Length, ReadAsync, IsForced: true);
 
-        public PushRequest Request(long? declaredLength) => new(declaredLength, ReadAsync);
+        public PushRequest Request(long? declaredLength) => new(declaredLength, ReadAsync, IsForced: true);
     }
 
     private Task<ReceiveResult> ReceiveAsync(PushRequest request) => _rig.Receiver.ReceiveAsync(request, CancellationToken.None);
@@ -177,7 +177,7 @@ public sealed class SaveReceiverTests : IAsyncLifetime
         {
             _rig.Game.Running = true;
             return Task.FromResult(zip);
-        });
+        }, IsForced: true);
 
         var result = await ReceiveAsync(request);
 
@@ -336,7 +336,7 @@ public sealed class SaveReceiverTests : IAsyncLifetime
             entered.SetResult();
             await release.Task;
             return zip;
-        }));
+        }, IsForced: true));
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
         var secondBody = new Body(zip);
 
@@ -356,7 +356,7 @@ public sealed class SaveReceiverTests : IAsyncLifetime
 
         var next = await ReceiveAsync(new Body(ValidZip).Request());
 
-        Assert.IsType<ReceiveResult.Replaced>(next);
+        Assert.IsType<ReceiveResult.Unchanged>(next);
         Assert.False(_rig.Gate.IsBusy);
     }
 
@@ -501,7 +501,7 @@ public sealed class SaveReceiverTests : IAsyncLifetime
     {
         var before = SaveInvariants.Capture(_rig);
         var game = new GameThatThrowsOnCall(throwingCall: 3);
-        var receiver = new SaveReceiver(_rig.Settings, game, _rig.Gate, _rig.Cache, _rig.Backups, new TotkSync.Core.Replace.MirrorReplacer(_rig.Ops, game, TotkSync.Core.Replace.SwapRetry.None));
+        var receiver = new SaveReceiver(_rig.Settings, game, _rig.Gate, _rig.Cache, _rig.Backups, new TotkSync.Core.Replace.MirrorReplacer(_rig.Ops, game, TotkSync.Core.Replace.SwapRetry.None), _rig.SyncState, _rig.Time);
 
         var result = await receiver.ReceiveAsync(new Body(ValidZip).Request(), CancellationToken.None);
 
@@ -518,7 +518,7 @@ public sealed class SaveReceiverTests : IAsyncLifetime
         var settings = new TotkSync.Core.Settings.SettingsSession(
             new TotkSync.Core.Settings.SettingsStore(_rig.Temp.Combine("no-game-settings.json")),
             new TotkSync.Core.Settings.LauncherSettings(GameDir: null));
-        var receiver = new SaveReceiver(settings, _rig.Game, _rig.Gate, _rig.Cache, _rig.Backups, _rig.Replacer);
+        var receiver = new SaveReceiver(settings, _rig.Game, _rig.Gate, _rig.Cache, _rig.Backups, _rig.Replacer, _rig.SyncState, _rig.Time);
         var body = new Body(ValidZip);
 
         var result = await receiver.ReceiveAsync(body.Request(), CancellationToken.None);

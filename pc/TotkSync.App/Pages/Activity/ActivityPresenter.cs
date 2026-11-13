@@ -33,6 +33,7 @@ public static class ActivityPresenter
             ActivityKind.MethodNotAllowed => "Method not allowed",
             ActivityKind.Internal => "Launcher error",
             ActivityKind.SaveReplaced => "Save received from Switch",
+            ActivityKind.SaveUnchanged => "Save already up to date",
             ActivityKind.InvalidZip => "Rejected: invalid save ZIP",
             ActivityKind.NoSave => "Rejected: no PC save yet",
             ActivityKind.Conflict => "Rejected: PC save changed since last sync",
@@ -48,6 +49,6 @@ public static class ActivityPresenter
 
     private static SymbolRegular Symbol(ActivityKind kind)
     {
-        return kind is ActivityKind.StatusOk or ActivityKind.SaveReplaced ? SymbolRegular.CheckmarkCircle16 : SymbolRegular.ErrorCircle16;
+        return kind is ActivityKind.StatusOk or ActivityKind.SaveReplaced or ActivityKind.SaveUnchanged ? SymbolRegular.CheckmarkCircle16 : SymbolRegular.ErrorCircle16;
     }
 }

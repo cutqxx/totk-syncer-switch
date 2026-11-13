@@ -36,7 +36,7 @@ static void send_and_show_result(const sync_env_t *env, const config_t *cfg, pc_
     char text[MAIN_SCREEN_SIZE];
     ui_draw_screen(TXT_SEND_TITLE "\n");
     send_to_pc(env, cfg, TS_MAX_SAVE_BYTES, &result);
-    if (result.kind == SEND_OK) {
+    if (result.kind == SEND_OK || result.kind == SEND_UNCHANGED) {
         pc_status_refresh(env, cfg, status);
     }
     main_screen_render_with_result(cfg, status, result.message, text, sizeof text);
@@ -58,7 +58,7 @@ static void run_connected_loop(PadState *pad, const config_t *cfg)
 {
     const net_port_t net = { .ctx = NULL, .perform = http_curl_perform };
     const clock_port_t clock = { .ctx = NULL, .now_local = clock_now_local, .sleep_seconds = clock_sleep_seconds };
-    const ui_port_t ui = { .ctx = pad, .show_line = ui_show_line, .choose_account = ui_choose_account };
+    const ui_port_t ui = { .ctx = pad, .show_line = ui_show_line, .choose_account = ui_choose_account, .confirm = ui_confirm };
     const console_port_t console = { .ctx = NULL,
                                      .find_game_process = system_nx_find_game_process,
                                      .list_accounts_with_save = system_nx_list_accounts_with_save,

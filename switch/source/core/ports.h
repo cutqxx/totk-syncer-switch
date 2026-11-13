@@ -28,6 +28,8 @@ typedef struct {
     void (*show_line)(void *ctx, const char *line);
     /* Blocks until the user picks an account; returns its index in list, or -1 when cancelled. */
     int (*choose_account)(void *ctx, const account_t *list, int count);
+    /* Shows prompt and blocks until A (true) or B (false) is pressed. */
+    bool (*confirm)(void *ctx, const char *prompt);
 } ui_port_t;
 
 /* The console side of "Send to PC". It can only look and read: there is deliberately no write or commit here. */

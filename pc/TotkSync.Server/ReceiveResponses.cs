@@ -6,11 +6,13 @@ namespace TotkSync.Server;
 
 internal static class ReceiveResponses
 {
-    public static Task WriteAsync(HttpContext context, ReceiveResult result)
+    public static Task WriteAsync(HttpContext context, ReceiveResult result, TimeProvider time)
     {
         return result switch
         {
             ReceiveResult.Replaced replaced => WriteReplaced(context, replaced),
+            ReceiveResult.Unchanged unchanged => WriteUnchanged(context, unchanged),
+            ReceiveResult.Conflict conflict => WriteConflict(context, conflict, time),
             ReceiveResult.InvalidZip invalid => RefuseWithReason(context, StatusCodes.Status400BadRequest, ActivityKind.InvalidZip, ApiErrors.InvalidZip, invalid.Reason),
             ReceiveResult.Failed failed => RefuseWithReason(context, StatusCodes.Status500InternalServerError, ActivityKind.WriteFailed, ApiErrors.WriteFailed, failed.Reason),
             ReceiveResult.NoSave => Refuse(context, StatusCodes.Status404NotFound, ActivityKind.NoSave, ApiErrors.NoSave),
@@ -27,6 +29,24 @@ internal static class ReceiveResponses
         ActivityRecording.SetKind(context, ActivityKind.SaveReplaced);
         var body = new PutReplacedResponse("replaced", replaced.BackupName, replaced.Fingerprint);
         return context.Response.WriteAsJsonAsync(body, ApiJsonContext.Default.PutReplacedResponse);
+    }
+
+    private static Task WriteUnchanged(HttpContext context, ReceiveResult.Unchanged unchanged)
+    {
+        ActivityRecording.SetKind(context, ActivityKind.SaveUnchanged);
+        var body = new PutUnchangedResponse("unchanged", unchanged.Fingerprint);
+        return context.Response.WriteAsJsonAsync(body, ApiJsonContext.Default.PutUnchangedResponse);
+    }
+
+    private static Task WriteConflict(HttpContext context, ReceiveResult.Conflict conflict, TimeProvider time)
+    {
+        ActivityRecording.SetKind(context, ActivityKind.Conflict);
+        context.Response.StatusCode = StatusCodes.Status409Conflict;
+        var body = new ConflictResponse(
+            ApiErrors.Conflict,
+            StatusMapping.FormatDate(conflict.PcModified, time),
+            conflict.LastSyncAt is { } lastSyncAt ? StatusMapping.FormatDate(lastSyncAt, time) : null);
+        return context.Response.WriteAsJsonAsync(body, ApiJsonContext.Default.ConflictResponse);
     }
 
     private static Task Refuse(HttpContext context, int statusCode, ActivityKind kind, string errorCode)

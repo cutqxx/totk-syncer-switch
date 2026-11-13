@@ -15,6 +15,8 @@
 
 typedef enum {
     API_PUT_REPLACED,       /* 200, marker, and a body that matches contracts/api/put-replaced.json */
+    API_PUT_UNCHANGED,      /* 200 "unchanged" (contracts/api/put-unchanged.json): the PC already has this save */
+    API_PUT_CONFLICT,       /* 409 conflict; pc_modified and last_sync_at set */
     API_PUT_UNREACHABLE,    /* curl 6 / 7 / 28 */
     API_PUT_NETWORK_ERROR,  /* any other curl failure with no usable HTTP answer */
     API_PUT_WRONG_TOKEN,    /* 401 from a launcher */
@@ -35,7 +37,9 @@ typedef struct {
     int curl_code;
     int64_t bytes_sent;
     char backup[API_PUT_BACKUP_SIZE];           /* API_PUT_REPLACED */
-    char fingerprint[API_PUT_FINGERPRINT_SIZE]; /* API_PUT_REPLACED */
+    char fingerprint[API_PUT_FINGERPRINT_SIZE]; /* API_PUT_REPLACED, API_PUT_UNCHANGED */
+    char pc_modified[API_MODIFIED_SIZE];        /* API_PUT_CONFLICT: "YYYY-MM-DD HH:MM" */
+    char last_sync_at[API_MODIFIED_SIZE];       /* API_PUT_CONFLICT: "YYYY-MM-DD HH:MM", empty when the PC never synced */
     char reason[API_PUT_REASON_SIZE];           /* printable ASCII; API_PUT_INVALID_ZIP and API_PUT_WRITE_FAILED */
 } api_put_result_t;
 
@@ -47,8 +51,11 @@ long api_put_timeout_s(int64_t zip_bytes);
    (so a refusal arrives before the body is sent). zip is not copied and must outlive the request. */
 void api_build_put_request(const config_t *cfg, const body_t *zip, http_request_t *out);
 
+/* The same request to /save?force=1: the PC replaces its save even when it changed since the last sync (it still backs up first). */
+void api_build_forced_put_request(const config_t *cfg, const body_t *zip, http_request_t *out);
+
 /* Classifies a finished PUT /save. A refusal that arrived before the connection broke (curl 55/56 with an HTTP code of
-   400 or more) counts as that refusal. Success needs 200, the marker header and a valid body. */
+   400 or more) counts as that refusal. Success needs 200, the marker header and a valid body ("replaced" or "unchanged"). */
 void api_interpret_put(const http_response_t *resp, api_put_result_t *out);
 
 #endif

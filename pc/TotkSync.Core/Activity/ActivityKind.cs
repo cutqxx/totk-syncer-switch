@@ -9,6 +9,7 @@ public enum ActivityKind
     MethodNotAllowed,
     Internal,
     SaveReplaced,
+    SaveUnchanged,
     InvalidZip,
     NoSave,
     Conflict,

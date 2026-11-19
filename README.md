@@ -179,7 +179,7 @@ pwsh -File build.ps1 test-all    # test + pc-test
 
 Отметьте после прогона на Switch с запущенным лаунчером.
 
-- [ ] .nro запускается из hbmenu и показывает путь к конфигу, адрес `http://<pc_host>:<pc_port>`, строку статуса и подсказки `A - Send to PC`, `R - refresh`, `+ - exit`.
+- [ ] .nro запускается из hbmenu и показывает путь к конфигу, адрес `http://<pc_host>:<pc_port>`, строку статуса и подсказки `A - Send to PC`, `X - Get from PC`, `Y - Backup to SD`, `R - refresh`, `+ - exit`.
 - [ ] Лаунчер открыт, сейв ПК есть: `PC: online, save from <дата время>`, время совпадает с датой сейва в карточке лаунчера.
 - [ ] Сейва ПК нет: `PC: online, no save`.
 - [ ] Игра на ПК запущена: `PC: TotK is running`.
@@ -228,7 +228,7 @@ pwsh -File build.ps1 test-all    # test + pc-test
 
 ### Слайс 1.4: подключение Switch
 
-- [ ] Главный экран показывает путь к конфигу, адрес ПК, строку статуса и подсказки `A - Send to PC`, `R - refresh`, `+ - exit`.
+- [ ] Главный экран показывает путь к конфигу, адрес ПК, строку статуса и подсказки `A - Send to PC`, `X - Get from PC`, `Y - Backup to SD`, `R - refresh`, `+ - exit`.
 - [ ] Строка статуса: `PC: online, save from <YYYY-MM-DD HH:MM>`, `PC: online, no save`, `PC: TotK is running`, `PC: not reachable` или `PC: error`; обновляется при запуске и по R.
 - [ ] Токен нигде на экране не виден.
 

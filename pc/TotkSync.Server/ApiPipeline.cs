@@ -20,20 +20,36 @@ internal static class ApiPipeline
     {
         app.Use(AddMarkerHeader);
         app.Use(ActivityRecording.Middleware(deps.Activity, deps.Time));
-        app.Use(AnswerInternalErrors);
+        app.Use(AnswerInternalErrors(deps.OnError));
         app.Use(RejectUnlessAllowed(Encoding.UTF8.GetBytes(deps.Token)));
     }
 
-    private static async Task AnswerInternalErrors(HttpContext context, RequestDelegate next)
+    private static Func<HttpContext, RequestDelegate, Task> AnswerInternalErrors(Action<Exception>? onError)
+    {
+        return async (context, next) =>
+        {
+            try
+            {
+                await next(context);
+            }
+            catch (Exception error) when (!context.Response.HasStarted)
+            {
+                ReportQuietly(onError, error);
+                context.Response.Headers[MarkerHeader] = MarkerValue;
+                await ApiErrors.WriteAsync(context, StatusCodes.Status500InternalServerError, ApiErrors.Internal);
+            }
+        };
+    }
+
+    private static void ReportQuietly(Action<Exception>? onError, Exception error)
     {
         try
         {
-            await next(context);
+            onError?.Invoke(error);
         }
-        catch (Exception) when (!context.Response.HasStarted)
+        catch
         {
-            context.Response.Headers[MarkerHeader] = MarkerValue;
-            await ApiErrors.WriteAsync(context, StatusCodes.Status500InternalServerError, ApiErrors.Internal);
+            // A broken error sink must not cost the Switch its marked 500 answer.
         }
     }
 

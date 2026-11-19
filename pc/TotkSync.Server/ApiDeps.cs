@@ -5,7 +5,7 @@ using TotkSync.Core.Sync;
 
 namespace TotkSync.Server;
 
-public sealed record ApiDeps(string Token, StatusQuery Status, ActivityLog Activity, TimeProvider Time, SaveReceiver? Receiver = null)
+public sealed record ApiDeps(string Token, StatusQuery Status, ActivityLog Activity, TimeProvider Time, SaveReceiver? Receiver = null, Action<Exception>? OnError = null)
 {
     private bool PrintMembers(StringBuilder builder)
     {

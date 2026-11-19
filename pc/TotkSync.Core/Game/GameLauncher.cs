@@ -1,11 +1,16 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using TotkSync.Core.Replace;
 using TotkSync.Core.Settings;
 using TotkSync.Core.Sync;
 
 namespace TotkSync.Core.Game;
 
-public sealed class GameLauncher(IGameProcess game, TransferGate gate, Action<ProcessStartInfo> start)
+public sealed class GameLauncher(
+    IGameProcess game,
+    TransferGate gate,
+    Action<ProcessStartInfo> start,
+    PendingRecovery? recovery = null)
 {
     private readonly CancellationTokenSource _closing = new();
 
@@ -25,6 +30,7 @@ public sealed class GameLauncher(IGameProcess game, TransferGate gate, Action<Pr
         {
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _closing.Token);
             using var lease = await EnterGateAsync(linked.Token);
+            await RecoverLeftoversAsync();
             return _closing.IsCancellationRequested ? new LaunchResult.Cancelled() : StartUnlessRunning(gameDir);
         }
         catch (OperationCanceledException)
@@ -46,6 +52,9 @@ public sealed class GameLauncher(IGameProcess game, TransferGate gate, Action<Pr
         Publish(LaunchPhase.WaitingForSaveTransfer);
         return await gate.EnterAsync(ct);
     }
+
+    private Task RecoverLeftoversAsync() =>
+        recovery is null ? Task.CompletedTask : Task.Run(recovery.RunHoldingGate);
 
     private LaunchResult StartUnlessRunning(string gameDir)
     {

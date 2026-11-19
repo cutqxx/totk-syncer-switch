@@ -101,7 +101,17 @@ public sealed class PutSaveEndpointTests : IAsyncLifetime
         return Assert.Single(_activity.Snapshot());
     }
 
-    private static byte[] ValidZip => ZipBuilder.ContractZip("valid-save-tree.zip");
+    private async Task<bool> GateTakenAsync()
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (!_rig.Gate.IsBusy && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(5);
+        }
+        return _rig.Gate.IsBusy;
+    }
+
+    private static byte[] ValidZip =>ZipBuilder.ContractZip("valid-save-tree.zip");
 
     [Fact]
     public async Task Valid_zip_gives_200_with_the_contract_shape_the_new_backup_name_and_fingerprint()
@@ -432,6 +442,9 @@ public sealed class PutSaveEndpointTests : IAsyncLifetime
             await stream.WriteAsync(Encoding.ASCII.GetBytes(header));
             await stream.WriteAsync(ValidZip.AsMemory(0, 100));
             await stream.FlushAsync();
+            // Cut only once the handler is reading the body: a request whose bytes arrive together with the close
+            // is dropped by Kestrel before it reaches the app, which is not the mid-upload drop under test.
+            Assert.True(await GateTakenAsync(), "the PUT never reached the body read");
         }
 
         var entry = await SingleJournalEntryAsync();

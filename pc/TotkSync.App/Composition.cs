@@ -52,7 +52,8 @@ public static class Composition
             provider.GetRequiredService<TimeProvider>(),
             IPAddress.Any,
             LanAddresses.Detect,
-            provider.GetRequiredService<SaveReceiver>()));
+            provider.GetRequiredService<SaveReceiver>(),
+            error => RecoveryLog.Append(provider.GetRequiredService<AppDataPaths>().ErrorLogFile, [error.ToString()], "Server error")));
     }
 
     private static void AddGame(IServiceCollection services)
@@ -67,7 +68,8 @@ public static class Composition
         services.AddSingleton(provider => new GameLauncher(
             provider.GetRequiredService<IGameProcess>(),
             provider.GetRequiredService<TransferGate>(),
-            info => Process.Start(info)?.Dispose()));
+            info => Process.Start(info)?.Dispose(),
+            provider.GetRequiredService<PendingRecovery>()));
         services.AddSingleton(provider => new LauncherShutdown(
             provider.GetRequiredService<TransferGate>(),
             provider.GetRequiredService<ServerHost>().StopAsync,

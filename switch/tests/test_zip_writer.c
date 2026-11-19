@@ -38,11 +38,13 @@ static void a_directory_name_gets_a_trailing_slash_exactly_once(void)
     CHECK(is_listed);
     if (is_listed) {
         CHECK_INT_EQ(listing.count, 2);
-        CHECK_STR_EQ(listing.items[0].name, "slot_00/");
-        CHECK(listing.items[0].is_directory);
-        CHECK_STR_EQ(listing.items[1].name, "album/");
-        CHECK(listing.items[1].is_directory);
-        CHECK_INT_EQ(listing.items[0].size, 0);
+        if (listing.count == 2) {
+            CHECK_STR_EQ(listing.items[0].name, "slot_00/");
+            CHECK(listing.items[0].is_directory);
+            CHECK_STR_EQ(listing.items[1].name, "album/");
+            CHECK(listing.items[1].is_directory);
+            CHECK_INT_EQ(listing.items[0].size, 0);
+        }
         test_zip_close(&listing);
     }
     body_free(&zip);
@@ -95,9 +97,12 @@ static void entries_keep_the_order_they_were_added_in(void)
     bool is_listed = test_zip_open(zip.data, (size_t)zip.size, &listing);
     CHECK(is_listed);
     if (is_listed) {
-        CHECK_STR_EQ(listing.items[0].name, "z.sav");
-        CHECK_STR_EQ(listing.items[1].name, "m/");
-        CHECK_STR_EQ(listing.items[2].name, "a.sav");
+        CHECK_INT_EQ(listing.count, 3);
+        if (listing.count == 3) {
+            CHECK_STR_EQ(listing.items[0].name, "z.sav");
+            CHECK_STR_EQ(listing.items[1].name, "m/");
+            CHECK_STR_EQ(listing.items[2].name, "a.sav");
+        }
         test_zip_close(&listing);
     }
     body_free(&zip);
@@ -163,7 +168,9 @@ static void a_different_timestamp_changes_the_bytes_but_not_the_content(void)
     bool are_listed = test_zip_open(first.data, (size_t)first.size, &first_listing);
     are_listed = test_zip_open(second.data, (size_t)second.size, &second_listing) && are_listed;
     CHECK(are_listed);
-    if (are_listed) {
+    CHECK_INT_EQ(first_listing.count, 1);
+    CHECK_INT_EQ(second_listing.count, 1);
+    if (are_listed && first_listing.count == 1 && second_listing.count == 1) {
         CHECK(first_listing.items[0].modified != second_listing.items[0].modified);
         CHECK_INT_EQ(first_listing.items[0].crc, second_listing.items[0].crc);
     }

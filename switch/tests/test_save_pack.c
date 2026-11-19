@@ -526,10 +526,12 @@ static void deeply_nested_folders_are_all_listed_before_the_file_inside(void)
     if (is_listed) {
         CHECK_INT_EQ(stats.directories, LEVELS);
         CHECK_INT_EQ(listing.count, LEVELS + 1);
-        CHECK_STR_EQ(listing.items[0].name, "d/");
-        CHECK_STR_EQ(listing.items[LEVELS - 1].name, expected_deepest);
-        CHECK_STR_EQ(listing.items[LEVELS].name, rel);
-        CHECK(memcmp(listing.items[LEVELS].data, "deep", 4) == 0);
+        if (listing.count == LEVELS + 1) {
+            CHECK_STR_EQ(listing.items[0].name, "d/");
+            CHECK_STR_EQ(listing.items[LEVELS - 1].name, expected_deepest);
+            CHECK_STR_EQ(listing.items[LEVELS].name, rel);
+            CHECK(memcmp(listing.items[LEVELS].data, "deep", 4) == 0);
+        }
         test_zip_close(&listing);
     }
     body_free(&zip);

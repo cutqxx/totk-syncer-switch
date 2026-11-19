@@ -89,3 +89,35 @@ bool http_response_has_header(const http_response_t *resp, const char *name, con
     }
     return false;
 }
+
+static void copy_trimmed_value(const char *line_after_colon, char *out, size_t out_size)
+{
+    const char *start = line_after_colon;
+    while (is_blank_char(*start)) {
+        start++;
+    }
+    size_t length = strcspn(start, "\r\n");
+    while (length > 0 && is_blank_char(start[length - 1])) {
+        length--;
+    }
+    snprintf(out, out_size, "%.*s", (int)length, start);
+}
+
+bool http_response_header_value(const http_response_t *resp, const char *name, char *out, size_t out_size)
+{
+    size_t name_length = strlen(name);
+    bool is_found = false;
+    out[0] = '\0';
+    for (const char *line = resp->response_headers; *line != '\0';) {
+        if (line_starts_with_name(line, name, name_length)) {
+            copy_trimmed_value(line + name_length + 1, out, out_size);
+            is_found = true;
+        }
+        const char *next = strchr(line, '\n');
+        if (next == NULL) {
+            break;
+        }
+        line = next + 1;
+    }
+    return is_found;
+}

@@ -29,10 +29,10 @@ void ui_show_line(void *ctx, const char *line)
     consoleUpdate(NULL);
 }
 
-static void draw_account_menu(const account_t *list, int count, int selected)
+static void draw_account_menu(const char *title, const account_t *list, int count, int selected)
 {
     char text[512];
-    account_menu_render(list, count, selected, text, sizeof text);
+    account_menu_render(title, list, count, selected, text, sizeof text);
     ui_draw_screen(text);
 }
 
@@ -65,11 +65,11 @@ bool ui_confirm(void *ctx, const char *prompt)
     return false;
 }
 
-int ui_choose_account(void *ctx, const account_t *list, int count)
+int ui_choose_account(void *ctx, const char *title, const account_t *list, int count)
 {
     PadState *pad = ctx;
     int selected = 0;
-    draw_account_menu(list, count, selected);
+    draw_account_menu(title, list, count, selected);
     while (appletMainLoop()) {
         padUpdate(pad);
         u64 pressed = padGetButtonsDown(pad);
@@ -82,7 +82,7 @@ int ui_choose_account(void *ctx, const account_t *list, int count)
         int moved_to = move_selection(selected, count, pressed);
         if (moved_to != selected) {
             selected = moved_to;
-            draw_account_menu(list, count, selected);
+            draw_account_menu(title, list, count, selected);
         }
         consoleUpdate(NULL);
     }

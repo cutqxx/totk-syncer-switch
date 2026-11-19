@@ -5,11 +5,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "account_pick.h"
-#include "ascii_text.h"
 #include "env_log.h"
 #include "redact.h"
 #include "retry.h"
+#include "save_steps.h"
 #include "text.h"
 
 typedef struct {
@@ -19,18 +18,7 @@ typedef struct {
     send_result_t *result;
 } send_context_t;
 
-static void show(const sync_env_t *env, const char *format, ...) __attribute__((format(printf, 2, 3)));
 static void fail(send_context_t *ctx, send_kind_t kind, const char *format, ...) __attribute__((format(printf, 3, 4)));
-
-static void show(const sync_env_t *env, const char *format, ...)
-{
-    char line[TS_LINE_SIZE];
-    va_list args;
-    va_start(args, format);
-    vsnprintf(line, sizeof line, format, args);
-    va_end(args);
-    env->ui->show_line(env->ui->ctx, line);
-}
 
 static void fail(send_context_t *ctx, send_kind_t kind, const char *format, ...)
 {
@@ -48,15 +36,7 @@ static long long to_kb(int64_t bytes)
 
 void send_describe_pack_failure(pack_status_t status, const pack_stats_t *stats, int64_t max_save_bytes, char *out, size_t out_size)
 {
-    char shown_path[TS_PATH_SIZE];
-    ascii_copy(stats->problem_path, shown_path, sizeof shown_path);
-    switch (status) {
-    case PACK_ERR_TOO_LARGE: snprintf(out, out_size, TXT_MSG_SAVE_TOO_LARGE, to_kb(stats->total_bytes), to_kb(max_save_bytes)); break;
-    case PACK_ERR_TOO_MANY_ENTRIES: snprintf(out, out_size, TXT_MSG_TOO_MANY_ENTRIES, TS_MAX_SAVE_ENTRIES); break;
-    case PACK_ERR_BAD_NAME: snprintf(out, out_size, TXT_MSG_BAD_ENTRY_NAME, shown_path); break;
-    case PACK_ERR_READ: snprintf(out, out_size, TXT_MSG_SAVE_READ_FAILED, shown_path); break;
-    default: snprintf(out, out_size, "%s", TXT_MSG_ZIP_FAILED); break;
-    }
+    save_steps_describe_pack_failure(status, stats, max_save_bytes, TXT_NOTHING_SENT, out, out_size);
 }
 
 static void describe_network_failure(const api_put_result_t *put, char *out, size_t out_size)
@@ -109,61 +89,35 @@ void send_format_transfer_note(const pack_stats_t *stats, const http_response_t 
              resp->seconds, kb_per_s, resp->http_code, resp->curl_code);
 }
 
-static bool confirm_game_is_closed(send_context_t *ctx)
+static send_kind_t send_kind_of(steps_status_t status)
 {
-    game_process_info_t info;
-    memset(&info, 0, sizeof info);
-    show(ctx->env, "%s", TXT_STEP_CHECK_GAME);
-    ctx->env->console->find_game_process(ctx->env->console->ctx, &info);
-    switch (game_guard_check(&info)) {
-    case GAME_CLEAR: return true;
-    case GAME_RUNNING: fail(ctx, SEND_GAME_RUNNING, "%s", TXT_MSG_CLOSE_TOTK); return false;
-    default: fail(ctx, SEND_GAME_CHECK_FAILED, TXT_MSG_GAME_CHECK_FAILED, (unsigned)info.error_code); return false;
+    switch (status) {
+    case STEPS_GAME_RUNNING: return SEND_GAME_RUNNING;
+    case STEPS_GAME_CHECK_FAILED: return SEND_GAME_CHECK_FAILED;
+    case STEPS_NO_SAVE_ON_CONSOLE: return SEND_NO_SAVE_ON_CONSOLE;
+    case STEPS_CANCELLED: return SEND_CANCELLED;
+    case STEPS_MOUNT_FAILED: return SEND_MOUNT_FAILED;
+    default: return SEND_PACK_FAILED;
     }
 }
 
-static bool choose_account(send_context_t *ctx, account_t *account)
+static bool step_passed(send_context_t *ctx, steps_status_t status)
 {
-    switch (account_pick(ctx->env, account)) {
-    case PICK_CHOSEN: return true;
-    case PICK_NO_SAVE: fail(ctx, SEND_NO_SAVE_ON_CONSOLE, "%s", TXT_MSG_NO_SAVE_ON_CONSOLE); return false;
-    default: fail(ctx, SEND_CANCELLED, "%s", TXT_MSG_SEND_CANCELLED); return false;
+    if (status != STEPS_OK) {
+        ctx->result->kind = send_kind_of(status);
     }
+    return status == STEPS_OK;
 }
 
-static pack_status_t pack_mounted_save(send_context_t *ctx, const char *root, body_t *zip, pack_stats_t *stats)
+static bool read_save_into_zip(send_context_t *ctx, body_t *zip, pack_stats_t *stats)
 {
-    struct tm now;
-    ctx->env->clock->now_local(ctx->env->clock->ctx, &now);
-    return save_pack_dir(root, &now, ctx->max_save_bytes, zip, stats);
-}
-
-static void report_pack_failure(send_context_t *ctx, pack_status_t status, const pack_stats_t *stats)
-{
-    char message[TS_LINE_SIZE];
-    send_describe_pack_failure(status, stats, ctx->max_save_bytes, message, sizeof message);
-    fail(ctx, SEND_PACK_FAILED, "%s", message);
-}
-
-static bool read_save_into_zip(send_context_t *ctx, const account_t *account, body_t *zip, pack_stats_t *stats)
-{
-    const console_port_t *console = ctx->env->console;
-    char root[TS_PATH_SIZE];
-    uint32_t error_code = 0;
-    show(ctx->env, TXT_STEP_READING_SAVE, account->name);
-    if (!console->mount_save_readonly(console->ctx, account, root, sizeof root, &error_code)) {
-        fail(ctx, SEND_MOUNT_FAILED, TXT_MSG_MOUNT_FAILED, (unsigned)error_code);
-        return false;
-    }
-    pack_status_t status = pack_mounted_save(ctx, root, zip, stats);
-    console->unmount_save(console->ctx);
-    if (status != PACK_OK) {
-        report_pack_failure(ctx, status, stats);
-        return false;
-    }
-    show(ctx->env, TXT_STEP_SAVE_READ, stats->files, stats->directories, to_kb(stats->total_bytes));
-    show(ctx->env, TXT_STEP_ZIP_READY, to_kb(stats->zip_bytes));
-    return true;
+    send_result_t *result = ctx->result;
+    account_t account;
+    return step_passed(ctx, save_steps_check_game(ctx->env, TXT_NOTHING_READ, result->message, sizeof result->message))
+           && step_passed(ctx, save_steps_pick_account(ctx->env, TXT_ACCOUNT_MENU_TITLE, TXT_NOTHING_SENT, &account,
+                                                       result->message, sizeof result->message))
+           && step_passed(ctx, save_steps_read_save(ctx->env, &account, ctx->max_save_bytes, TXT_NOTHING_SENT, zip, stats,
+                                                    result->message, sizeof result->message));
 }
 
 static void record_put_result(send_context_t *ctx, const api_put_result_t *put)
@@ -192,8 +146,8 @@ static void put_zip(send_context_t *ctx, const body_t *zip, const pack_stats_t *
     } else {
         api_build_put_request(ctx->cfg, zip, &request);
     }
-    show(ctx->env, TXT_STEP_SENDING, to_kb(zip->size));
-    show(ctx->env, "%s", TXT_STEP_WAIT);
+    save_steps_show(ctx->env, TXT_STEP_SENDING, to_kb(zip->size));
+    save_steps_show(ctx->env, "%s", TXT_STEP_WAIT);
     retry_perform_unsent(ctx->env, &request, &response);
     send_format_transfer_note(stats, &response, note, sizeof note);
     env_log_note(ctx->env, note);
@@ -214,7 +168,7 @@ static void upload_zip(send_context_t *ctx, const body_t *zip, const pack_stats_
     put_zip(ctx, zip, stats, false, &put);
     if (put.kind == API_PUT_CONFLICT) {
         if (!user_agrees_to_overwrite(ctx, &put)) {
-            fail(ctx, SEND_CANCELLED, "%s", TXT_MSG_SEND_CANCELLED);
+            fail(ctx, SEND_CANCELLED, TXT_MSG_CANCELLED, TXT_NOTHING_SENT);
             return;
         }
         put_zip(ctx, zip, stats, true, &put);
@@ -225,12 +179,11 @@ static void upload_zip(send_context_t *ctx, const body_t *zip, const pack_stats_
 void send_to_pc(const sync_env_t *env, const config_t *cfg, int64_t max_save_bytes, send_result_t *out)
 {
     send_context_t ctx = { env, cfg, max_save_bytes, out };
-    account_t account;
     body_t zip = { NULL, 0 };
     pack_stats_t stats;
     memset(out, 0, sizeof *out);
     memset(&stats, 0, sizeof stats);
-    if (confirm_game_is_closed(&ctx) && choose_account(&ctx, &account) && read_save_into_zip(&ctx, &account, &zip, &stats)) {
+    if (read_save_into_zip(&ctx, &zip, &stats)) {
         upload_zip(&ctx, &zip, &stats);
     }
     body_free(&zip);

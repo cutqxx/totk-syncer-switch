@@ -83,3 +83,13 @@ int system_nx_list_accounts_with_save(void *ctx, account_t *out, int max)
     fsSaveDataInfoReaderClose(&reader);
     return count;
 }
+
+void system_nx_set_home_blocked(void *ctx, bool is_blocked)
+{
+    (void)ctx;
+    if (is_blocked) {
+        appletBeginBlockingHomeButton(0);
+    } else {
+        appletEndBlockingHomeButton();
+    }
+}

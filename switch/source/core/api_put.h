@@ -43,6 +43,9 @@ typedef struct {
     char reason[API_PUT_REASON_SIZE];           /* printable ASCII; API_PUT_INVALID_ZIP and API_PUT_WRITE_FAILED */
 } api_put_result_t;
 
+/* "sha256:" followed by exactly 64 lowercase hex digits. */
+bool api_is_fingerprint(const char *text);
+
 /* Seconds allowed for the whole PUT: TS_UPLOAD_BASE_TIMEOUT_S plus the time at TS_UPLOAD_MIN_SPEED_BYTES_PER_S,
    at most TS_UPLOAD_MAX_TIMEOUT_S. */
 long api_put_timeout_s(int64_t zip_bytes);

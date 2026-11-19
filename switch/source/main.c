@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <switch.h>
 
+#include "backup_to_sd.h"
 #include "clock_nx.h"
+#include "file_ops.h"
+#include "get_from_pc.h"
 #include "config.h"
 #include "http_curl.h"
 #include "log.h"
@@ -43,6 +46,32 @@ static void send_and_show_result(const sync_env_t *env, const config_t *cfg, pc_
     ui_draw_screen(text);
 }
 
+static void show_result(const config_t *cfg, const pc_status_t *status, const char *message)
+{
+    char text[MAIN_SCREEN_SIZE];
+    main_screen_render_with_result(cfg, status, message, text, sizeof text);
+    ui_draw_screen(text);
+}
+
+static void backup_and_show_result(const sync_env_t *env, const config_t *cfg, const pc_status_t *status)
+{
+    backup_result_t result;
+    ui_draw_screen(TXT_BACKUP_TITLE "\n");
+    backup_save_to_sd(env, cfg, TS_MAX_SAVE_BYTES, &result);
+    show_result(cfg, status, result.message);
+}
+
+static void pull_and_show_result(const sync_env_t *env, const config_t *cfg, pc_status_t *status)
+{
+    pull_result_t result;
+    ui_draw_screen(TXT_PULL_TITLE "\n");
+    get_from_pc(env, cfg, &result);
+    if (result.kind == PULL_OK || result.kind == PULL_OK_ACK_FAILED) {
+        pc_status_refresh(env, cfg, status);
+    }
+    show_result(cfg, status, result.message);
+}
+
 static void wait_for_exit(PadState *pad)
 {
     while (appletMainLoop()) {
@@ -63,10 +92,14 @@ static void run_connected_loop(PadState *pad, const config_t *cfg)
                                      .find_game_process = system_nx_find_game_process,
                                      .list_accounts_with_save = system_nx_list_accounts_with_save,
                                      .mount_save_readonly = save_fs_mount_readonly,
-                                     .unmount_save = save_fs_unmount };
+                                     .unmount_save = save_fs_unmount,
+                                     .mount_save_readwrite = save_fs_mount_readwrite,
+                                     .commit_save = save_fs_commit,
+                                     .read_save_space = save_fs_read_space,
+                                     .set_home_blocked = system_nx_set_home_blocked };
     log_sink_t log;
     log_sink_init(&log, SD_ROOT, cfg->token);
-    const sync_env_t env = { &net, &clock, &ui, &log, &console };
+    const sync_env_t env = { &net, &clock, &ui, &log, &console, file_ops_stdio(), SD_ROOT };
     pc_status_t status;
 
     system_nx_init();
@@ -82,6 +115,12 @@ static void run_connected_loop(PadState *pad, const config_t *cfg)
         }
         if (pressed & HidNpadButton_A) {
             send_and_show_result(&env, cfg, &status);
+        }
+        if (pressed & HidNpadButton_X) {
+            pull_and_show_result(&env, cfg, &status);
+        }
+        if (pressed & HidNpadButton_Y) {
+            backup_and_show_result(&env, cfg, &status);
         }
         consoleUpdate(NULL);
     }

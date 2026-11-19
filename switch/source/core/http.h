@@ -2,6 +2,7 @@
 #define TS_HTTP_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "body.h"
@@ -45,5 +46,8 @@ void http_response_free(http_response_t *resp);
 
 /* True when a header line with this name (case-insensitive) and exactly this value (surrounding blanks ignored) exists. */
 bool http_response_has_header(const http_response_t *resp, const char *name, const char *value);
+
+/* The value of the last header line with this name (case-insensitive), surrounding blanks removed; false when absent. */
+bool http_response_header_value(const http_response_t *resp, const char *name, char *out, size_t out_size);
 
 #endif

@@ -35,6 +35,10 @@ const test_zip_item_t *test_zip_find(const test_zip_t *zip, const char *name);
    ZIP must hold no junk). */
 void test_zip_fingerprint(const test_zip_t *zip, char out[80]);
 
+/* The save fingerprint and the entry list of a directory tree as the PC would see it (packed without junk):
+   equal text means equal content, whatever the file times. */
+void test_tree_identity(const char *root, char *out, size_t out_size);
+
 /* contracts/save-zip/cases.json parsed; the caller releases it with cJSON_Delete. NULL when unreadable. */
 cJSON *test_load_cases(void);
 

@@ -54,7 +54,7 @@ static bool is_lower_hex(char c)
     return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
 }
 
-static bool is_fingerprint(const char *text)
+bool api_is_fingerprint(const char *text)
 {
     size_t prefix_length = strlen(FINGERPRINT_PREFIX);
     if (strncmp(text, FINGERPRINT_PREFIX, prefix_length) != 0 || strlen(text) != prefix_length + FINGERPRINT_HEX_LENGTH) {
@@ -86,7 +86,7 @@ static bool is_backup_name(const char *text)
 static bool read_fingerprint(const cJSON *root, api_put_result_t *out)
 {
     const char *fingerprint = string_field(root, "fingerprint");
-    if (fingerprint == NULL || !is_fingerprint(fingerprint)) {
+    if (fingerprint == NULL || !api_is_fingerprint(fingerprint)) {
         return false;
     }
     snprintf(out->fingerprint, sizeof out->fingerprint, "%s", fingerprint);

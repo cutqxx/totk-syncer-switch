@@ -1,5 +1,6 @@
 #include "test_support.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,6 +60,10 @@ static void fake_perform(void *ctx, const http_request_t *req, http_response_t *
         body_append(&world->sent_body, req->body->data, (size_t)req->body->size, INT64_MAX);
     }
     test_fill_response(out, &world->replies[index]);
+    if (world->binary_body != NULL && index == world->binary_reply_index) {
+        body_free(&out->body);
+        body_append(&out->body, world->binary_body, world->binary_body_size, INT64_MAX);
+    }
     out->bytes_sent = world->reply_bytes_sent;
     out->seconds = world->reply_seconds;
 }
@@ -83,13 +88,15 @@ static void fake_show_line(void *ctx, const char *line)
     if (world->ui_line_count < MAX_RECORDED_LINES) {
         snprintf(world->ui_lines[world->ui_line_count], TS_LINE_SIZE, "%s", line);
     }
+    snprintf(world->last_ui_line, sizeof world->last_ui_line, "%s", line);
     world->ui_line_count++;
 }
 
-static int fake_choose_account(void *ctx, const account_t *list, int count)
+static int fake_choose_account(void *ctx, const char *title, const account_t *list, int count)
 {
     fake_world_t *world = ctx;
     (void)list;
+    snprintf(world->choose_title, sizeof world->choose_title, "%s", title);
     world->choose_calls++;
     world->choose_offered = count;
     return world->choose_result;
@@ -98,9 +105,12 @@ static int fake_choose_account(void *ctx, const account_t *list, int count)
 static bool fake_confirm(void *ctx, const char *prompt)
 {
     fake_world_t *world = ctx;
-    world->confirm_calls++;
+    int index = world->confirm_calls++;
     snprintf(world->confirm_prompt, sizeof world->confirm_prompt, "%s", prompt);
-    return world->confirm_answer;
+    if (index < MAX_RECORDED_PROMPTS) {
+        snprintf(world->confirm_prompts[index], TS_LINE_SIZE, "%s", prompt);
+    }
+    return index < world->confirm_answer_count ? world->confirm_answers[index] : world->confirm_answer;
 }
 
 void fake_world_init(fake_world_t *world, const scripted_reply_t *replies, int reply_count)
@@ -117,7 +127,7 @@ void fake_world_init(fake_world_t *world, const scripted_reply_t *replies, int r
     world->ui = (ui_port_t){ .ctx = world, .show_line = fake_show_line, .choose_account = fake_choose_account,
                               .confirm = fake_confirm };
     world->choose_result = -1;
-    world->env = (sync_env_t){ &world->net, &world->clock, &world->ui, NULL, NULL };
+    world->env = (sync_env_t){ &world->net, &world->clock, &world->ui, NULL, NULL, file_ops_stdio(), NULL };
 }
 
 void test_make_config(config_t *cfg)
@@ -148,9 +158,9 @@ void fake_world_release(fake_world_t *world)
 static void fake_find_game_process(void *ctx, game_process_info_t *out)
 {
     fake_console_t *console = ctx;
-    console->probe_calls++;
+    int index = console->probe_calls++;
     if (!console->is_probe_left_untouched) {
-        *out = console->probe;
+        *out = index < console->probe_results_count ? console->probe_results[index] : console->probe;
     }
 }
 
@@ -176,6 +186,7 @@ static bool fake_mount(void *ctx, const account_t *account, char *root_out, size
         return false;
     }
     snprintf(root_out, root_size, "%s", console->mount_root);
+    console->is_mounted = true;
     return true;
 }
 
@@ -183,7 +194,59 @@ static void fake_unmount(void *ctx)
 {
     fake_console_t *console = ctx;
     console->unmount_calls++;
+    console->is_mounted = false;
     console->net_calls_at_unmount = console->world->net_calls;
+}
+
+static bool fake_mount_rw(void *ctx, const account_t *account, char *root_out, size_t root_size, uint32_t *error_code)
+{
+    fake_console_t *console = ctx;
+    console->rw_mount_calls++;
+    console->mounted_account = *account;
+    if (!console->does_rw_mount_succeed || console->rw_mount_calls == console->fail_rw_mount_at) {
+        *error_code = console->rw_mount_error;
+        return false;
+    }
+    snprintf(root_out, root_size, "%s", console->mount_root);
+    console->is_mounted = true;
+    return true;
+}
+
+static bool fake_commit(void *ctx, uint32_t *error_code)
+{
+    fake_console_t *console = ctx;
+    console->commit_calls++;
+    if (console->watched_files != NULL) {
+        console->commits_with_open_files += console->watched_files->open_handles > 0 ? 1 : 0;
+    }
+    if (console->commit_calls == console->fail_commit_at) {
+        *error_code = console->commit_error;
+        return false;
+    }
+    if (console->watched_files != NULL) {
+        console->watched_files->bytes_since_commit = 0;
+    }
+    return true;
+}
+
+static bool fake_read_space(void *ctx, const account_t *account, int64_t *data_bytes, int64_t *journal_bytes)
+{
+    fake_console_t *console = ctx;
+    (void)account;
+    *data_bytes = console->data_bytes;
+    *journal_bytes = console->journal_bytes;
+    return console->is_space_known;
+}
+
+static void fake_set_home_blocked(void *ctx, bool is_blocked)
+{
+    fake_console_t *console = ctx;
+    console->is_home_blocked = is_blocked;
+    if (is_blocked) {
+        console->home_block_calls++;
+    } else {
+        console->home_unblock_calls++;
+    }
 }
 
 void fake_console_init(fake_console_t *console, fake_world_t *world)
@@ -198,8 +261,125 @@ void fake_console_init(fake_console_t *console, fake_world_t *world)
     console->does_mount_succeed = true;
     console->net_calls_at_mount = -1;
     console->net_calls_at_unmount = -1;
+    console->does_rw_mount_succeed = true;
     console->port = (console_port_t){ .ctx = console, .find_game_process = fake_find_game_process,
                                       .list_accounts_with_save = fake_list_accounts, .mount_save_readonly = fake_mount,
-                                      .unmount_save = fake_unmount };
+                                      .unmount_save = fake_unmount, .mount_save_readwrite = fake_mount_rw,
+                                      .commit_save = fake_commit, .read_save_space = fake_read_space,
+                                      .set_home_blocked = fake_set_home_blocked };
     world->env.console = &console->port;
+}
+
+static bool faulty_counts(faulty_files_t *files, fault_step_t step, const char *path)
+{
+    if (files->only_under != NULL && (path == NULL || strncmp(path, files->only_under, strlen(files->only_under)) != 0)) {
+        return false;
+    }
+    files->calls[step]++;
+    if (step == files->fail_step && files->calls[step] == files->fail_at) {
+        errno = ENOSPC;
+        return true;
+    }
+    return false;
+}
+
+typedef struct {
+    void *file;
+    char path[512];
+} faulty_handle_t;
+
+static void *faulty_open(void *ctx, const char *path, bool is_append)
+{
+    faulty_files_t *files = ctx;
+    if (faulty_counts(files, FAULT_OPEN, path)) {
+        return NULL;
+    }
+    faulty_handle_t *handle = calloc(1, sizeof *handle);
+    handle->file = file_ops_stdio()->open_write(NULL, path, is_append);
+    if (handle->file == NULL) {
+        free(handle);
+        return NULL;
+    }
+    snprintf(handle->path, sizeof handle->path, "%s", path);
+    files->open_handles++;
+    files->mutations++;
+    return handle;
+}
+
+static bool faulty_write(void *ctx, void *file, const void *data, size_t size)
+{
+    faulty_files_t *files = ctx;
+    faulty_handle_t *handle = file;
+    if (faulty_counts(files, FAULT_WRITE, handle->path)) {
+        size_t half = size / 2;
+        file_ops_stdio()->write(NULL, handle->file, data, half);
+        errno = ENOSPC;
+        return false;
+    }
+    bool is_written = file_ops_stdio()->write(NULL, handle->file, data, size);
+    files->mutations += is_written ? 1 : 0;
+    files->bytes_since_commit += is_written ? (int64_t)size : 0;
+    if (files->bytes_since_commit > files->max_bytes_between_commits) {
+        files->max_bytes_between_commits = files->bytes_since_commit;
+    }
+    return is_written;
+}
+
+static bool faulty_close(void *ctx, void *file)
+{
+    faulty_files_t *files = ctx;
+    faulty_handle_t *handle = file;
+    bool is_failing = faulty_counts(files, FAULT_CLOSE, handle->path);
+    bool is_closed = file_ops_stdio()->close(NULL, handle->file);
+    files->open_handles--;
+    free(handle);
+    if (is_failing) {
+        errno = ENOSPC;
+        return false;
+    }
+    return is_closed;
+}
+
+static bool faulty_path_op(faulty_files_t *files, fault_step_t step, const char *path, bool (*real)(void *, const char *))
+{
+    if (faulty_counts(files, step, path)) {
+        return false;
+    }
+    bool is_done = real(NULL, path);
+    files->mutations += is_done ? 1 : 0;
+    return is_done;
+}
+
+static bool faulty_make_dir(void *ctx, const char *path)
+{
+    return faulty_path_op(ctx, FAULT_MAKE_DIR, path, file_ops_stdio()->make_dir);
+}
+
+static bool faulty_remove_file(void *ctx, const char *path)
+{
+    return faulty_path_op(ctx, FAULT_REMOVE_FILE, path, file_ops_stdio()->remove_file);
+}
+
+static bool faulty_remove_dir(void *ctx, const char *path)
+{
+    return faulty_path_op(ctx, FAULT_REMOVE_DIR, path, file_ops_stdio()->remove_dir);
+}
+
+static bool faulty_rename(void *ctx, const char *from, const char *to)
+{
+    faulty_files_t *files = ctx;
+    if (faulty_counts(files, FAULT_RENAME, from)) {
+        return false;
+    }
+    bool is_done = file_ops_stdio()->rename(NULL, from, to);
+    files->mutations += is_done ? 1 : 0;
+    return is_done;
+}
+
+void faulty_files_init(faulty_files_t *files)
+{
+    memset(files, 0, sizeof *files);
+    files->ops = (file_ops_t){ .ctx = files, .open_write = faulty_open, .write = faulty_write, .close = faulty_close,
+                               .make_dir = faulty_make_dir, .remove_file = faulty_remove_file,
+                               .remove_dir = faulty_remove_dir, .rename = faulty_rename };
 }

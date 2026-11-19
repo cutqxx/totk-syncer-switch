@@ -40,11 +40,19 @@ static void every_screen_and_log_string_is_printable_ascii(void)
         TXT_CONFIG_LEGACY_PHASE0, TXT_CONFIG_NOT_PRIVATE_IPV4, TXT_CONFIG_PORT_INVALID, TXT_CONFIG_TOKEN_INVALID,
         TXT_CONFIG_KEEP_BACKUPS_INVALID, TXT_SEND_TITLE, TXT_STEP_CHECK_GAME, TXT_STEP_READING_SAVE, TXT_STEP_SAVE_READ,
         TXT_STEP_ZIP_READY, TXT_STEP_SENDING, TXT_STEP_WAIT, TXT_RESULT_SENT, TXT_ACCOUNT_MENU_TITLE, TXT_ACCOUNT_MENU_BUTTONS,
-        TXT_MSG_CLOSE_TOTK, TXT_MSG_GAME_CHECK_FAILED, TXT_MSG_NO_SAVE_ON_CONSOLE, TXT_MSG_SEND_CANCELLED, TXT_MSG_MOUNT_FAILED,
+        TXT_MSG_CLOSE_TOTK, TXT_MSG_GAME_CHECK_FAILED, TXT_MSG_NO_SAVE_ON_CONSOLE, TXT_MSG_CANCELLED, TXT_MSG_MOUNT_FAILED,
         TXT_MSG_SAVE_TOO_LARGE, TXT_MSG_TOO_MANY_ENTRIES, TXT_MSG_BAD_ENTRY_NAME, TXT_MSG_SAVE_READ_FAILED, TXT_MSG_ZIP_FAILED,
         TXT_MSG_PC_REJECTED, TXT_MSG_PC_GAME_RUNNING, TXT_MSG_PC_BUSY, TXT_MSG_PC_NO_SAVE, TXT_MSG_PC_WRITE_FAILED,
         TXT_MSG_SEND_UNCERTAIN, TXT_MSG_BAD_PUT_RESPONSE,
         TXT_RESULT_UNCHANGED, TXT_PROMPT_OVERWRITE, TXT_LAST_SYNC_NEVER,
+        TXT_ACCOUNT_MENU_BACKUP_TITLE, TXT_ACCOUNT_MENU_PULL_TITLE, TXT_NOTHING_SENT, TXT_NOTHING_READ, TXT_NO_BACKUP_MADE,
+        TXT_SWITCH_SAVE_NOT_CHANGED, TXT_BACKUP_TITLE, TXT_STEP_WRITING_BACKUP, TXT_RESULT_BACKUP_OK, TXT_MSG_BACKUP_FAILED,
+        TXT_PULL_TITLE, TXT_STEP_DOWNLOADING, TXT_STEP_CHECKING_ZIP, TXT_PROMPT_RESTORE, TXT_STEP_WRITING_SAVE,
+        TXT_STEP_RESTORING_BACKUP, TXT_RESULT_RESTORED, TXT_WARN_ACK_FAILED, TXT_MSG_PC_SAVE_INVALID,
+        TXT_MSG_PULL_PC_NO_SAVE, TXT_MSG_PC_READ_FAILED, TXT_MSG_BAD_GET_RESPONSE, TXT_MSG_DOWNLOAD_FAILED,
+        TXT_MSG_DOES_NOT_FIT, TXT_MSG_SPACE_UNKNOWN, TXT_MSG_PRE_PULL_BACKUP_FAILED, TXT_MSG_RW_MOUNT_FAILED,
+        TXT_MSG_WRITE_FAILED_UNCHANGED, TXT_PROMPT_WRITE_FAILED, TXT_RESULT_BACKUP_RESTORED, TXT_MSG_LEFT_INCOMPLETE,
+        TXT_MSG_RESTORE_FAILED,
     };
     for (size_t i = 0; i < sizeof strings / sizeof strings[0]; i++) {
         CHECK(test_is_ascii_text(strings[i]));
@@ -173,7 +181,8 @@ static void phase0_yandex_webdav_and_experiments_are_gone_from_the_app(void)
 {
     CHECK_INT_EQ(count_source_files_containing("webdav"), 0);
     CHECK_INT_EQ(count_source_files_containing("yandex"), 0);
-    CHECK_INT_EQ(count_source_files_containing("JKSV"), 0);
+    CHECK_INT_EQ(count_source_files_containing("config/JKSV"), 0);
+    CHECK_INT_EQ(count_source_files_containing("webdav.json"), 0);
     CHECK_INT_EQ(count_source_files_containing("test.zip"), 0);
     CHECK_INT_EQ(count_source_files_containing("https://"), 0);
 }
@@ -256,18 +265,26 @@ static int count_writable_save_mounts(void)
     return offenders;
 }
 
-static void the_app_never_commits_to_the_file_system(void)
+/* Phase 2: the save is committed in exactly one place, the save_fs adapter. */
+static void only_the_save_adapter_commits(void)
 {
-    CHECK_INT_EQ(count_source_files_containing("fsdevCommitDevice"), 0);
+    CHECK_INT_EQ(count_source_files_containing("fsdevCommit"), 1);
+    CHECK(file_contains(SOURCE_DIR "/platform", "save_fs.c", "fsdevCommitDevice(MOUNT_NAME)"));
     CHECK_INT_EQ(count_source_files_containing("fsFsCommit"), 0);
-    CHECK_INT_EQ(count_source_files_containing("fsdevCommit"), 0);
 }
 
-static void the_save_is_only_ever_mounted_read_only(void)
+/* Phase 2: one writable mount, in the save_fs adapter; reading still uses the read-only mount. In the core only the
+   save writer and the "Get from PC" scenario ask for the writable mount or a commit. */
+static void the_save_is_mounted_writable_in_one_place_only(void)
 {
-    CHECK_INT_EQ(count_writable_save_mounts(), 0);
+    CHECK_INT_EQ(count_writable_save_mounts(), 1);
+    CHECK(file_contains(SOURCE_DIR "/platform", "save_fs.c", "fsdevMountSaveData(MOUNT_NAME"));
     CHECK_INT_EQ(count_source_files_containing("fsOpenSaveDataFileSystem"), 0);
     CHECK(file_contains(SOURCE_DIR "/platform", "save_fs.c", "fsdevMountSaveDataReadOnly("));
+    CHECK_INT_EQ(count_files_containing(SOURCE_DIR "/core", "->mount_save_readwrite("), 1);
+    CHECK_INT_EQ(count_files_containing(SOURCE_DIR "/core", "->commit_save("), 1);
+    CHECK(file_contains(SOURCE_DIR "/core", "save_write.c", "->commit_save("));
+    CHECK(file_contains(SOURCE_DIR "/core", "get_from_pc.c", "->mount_save_readwrite("));
 }
 
 static void the_code_that_touches_the_save_has_no_write_calls(void)
@@ -283,6 +300,10 @@ static void the_code_that_touches_the_save_has_no_write_calls(void)
         { SOURCE_DIR "/core", "save_pack.c" },
         { SOURCE_DIR "/core", "save_rules.c" },
         { SOURCE_DIR "/core", "account_pick.c" },
+        { SOURCE_DIR "/core", "save_steps.c" },
+        { SOURCE_DIR "/core", "backup_to_sd.c" },
+        { SOURCE_DIR "/core", "save_validate.c" },
+        { SOURCE_DIR "/core", "zip_reader.c" },
         { SOURCE_DIR "/platform", "save_fs.c" },
         { SOURCE_DIR "/platform", "system_nx.c" },
     };
@@ -319,9 +340,10 @@ static void miniz_comes_only_from_third_party_with_its_license(void)
         free(copy_h);
     }
     is_offender_printing_on = false;
-    CHECK_INT_EQ(count_source_files_containing("#include \"miniz"), 1);
+    CHECK_INT_EQ(count_source_files_containing("#include \"miniz"), 2);
     is_offender_printing_on = true;
     CHECK(file_contains(SOURCE_DIR "/core", "zip_writer.c", "#include \"miniz.h\""));
+    CHECK(file_contains(SOURCE_DIR "/core", "zip_reader.c", "#include \"miniz.h\""));
 }
 
 static void both_makefiles_build_miniz_from_third_party_without_zlib_names(void)
@@ -347,8 +369,8 @@ void run_text_and_repo_rule_tests(void)
     RUN_TEST(curl_adapter_allows_only_plain_http_and_no_redirects);
     RUN_TEST(every_text_macro_is_in_the_ascii_guard_list);
     RUN_TEST(the_unused_send_not_available_text_is_gone);
-    RUN_TEST(the_app_never_commits_to_the_file_system);
-    RUN_TEST(the_save_is_only_ever_mounted_read_only);
+    RUN_TEST(only_the_save_adapter_commits);
+    RUN_TEST(the_save_is_mounted_writable_in_one_place_only);
     RUN_TEST(the_code_that_touches_the_save_has_no_write_calls);
     RUN_TEST(the_curl_adapter_applies_the_100_continue_wait);
     RUN_TEST(miniz_comes_only_from_third_party_with_its_license);

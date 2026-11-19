@@ -140,7 +140,7 @@ static void worst_case_content_still_fits_the_screen_buffer_with_the_hints(void)
     memset(st.status_line, 's', sizeof st.status_line - 1);
     memset(st.detail, 'd', sizeof st.detail - 1);
     main_screen_render(&cfg, NULL, &st, screen, sizeof screen);
-    CHECK(strstr(screen, "A - Send to PC    R - refresh    + - exit") != NULL);
+    CHECK(strstr(screen, "A - Send to PC    X - Get from PC    Y - Backup to SD\nR - refresh    + - exit") != NULL);
 }
 
 static void a_small_output_buffer_is_never_overrun_and_stays_terminated(void)
@@ -191,7 +191,7 @@ static void the_result_block_sits_between_the_status_and_the_button_hints(void)
                  "PC:      http://192.168.1.10:8765\n\n"
                  "PC: online, save from 2026-11-03 14:25\n"
                  "\n" SENT_RESULT "\n"
-                 "\nA - Send to PC    R - refresh    + - exit\n");
+                 "\nA - Send to PC    X - Get from PC    Y - Backup to SD\nR - refresh    + - exit\n");
 }
 
 static void without_a_result_the_screen_equals_the_plain_connected_screen(void)
@@ -246,7 +246,7 @@ static void the_worst_case_result_still_leaves_the_button_hints_in_the_buffer(vo
     result[sizeof result - 1] = '\0';
     main_screen_render_with_result(&cfg, &st, result, screen, sizeof screen);
     CHECK(strstr(screen, result) != NULL);
-    CHECK(strstr(screen, "A - Send to PC    R - refresh    + - exit\n") != NULL);
+    CHECK(strstr(screen, "A - Send to PC    X - Get from PC    Y - Backup to SD\nR - refresh    + - exit\n") != NULL);
 }
 
 static void a_small_buffer_is_never_overrun_when_a_result_is_shown(void)

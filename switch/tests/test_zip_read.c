@@ -1,5 +1,7 @@
 #include "test_zip_read.h"
 
+#include "save_pack.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -117,4 +119,28 @@ const cJSON *test_find_case(const cJSON *cases, const char *zip_file)
         }
     }
     return NULL;
+}
+
+void test_tree_identity(const char *root, char *out, size_t out_size)
+{
+    static const struct tm when = { .tm_year = 126, .tm_mon = 10, .tm_mday = 3 };
+    body_t zip = { NULL, 0 };
+    pack_stats_t stats;
+    test_zip_t listing;
+    char fingerprint[80] = "";
+    out[0] = '\0';
+    if (save_pack_dir(root, &when, 64LL * 1024 * 1024, &zip, &stats) != PACK_OK
+        || !test_zip_open(zip.data, (size_t)zip.size, &listing)) {
+        snprintf(out, out_size, "unreadable");
+        body_free(&zip);
+        return;
+    }
+    test_zip_fingerprint(&listing, fingerprint);
+    snprintf(out, out_size, "%s", fingerprint);
+    for (int i = 0; i < listing.count; i++) {
+        size_t used = strlen(out);
+        snprintf(out + used, out_size - used, "|%s", listing.items[i].name);
+    }
+    test_zip_close(&listing);
+    body_free(&zip);
 }

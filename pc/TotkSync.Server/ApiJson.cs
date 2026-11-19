@@ -24,6 +24,10 @@ public sealed record PutUnchangedResponse(string Result, string Fingerprint);
 
 public sealed record ConflictResponse(string Error, string PcModified, string? LastSyncAt);
 
+public sealed record AckRequest(string? Fingerprint);
+
+public sealed record AckRecordedResponse(string Result);
+
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
 [JsonSerializable(typeof(StatusResponse))]
 [JsonSerializable(typeof(ErrorResponse))]
@@ -31,4 +35,6 @@ public sealed record ConflictResponse(string Error, string PcModified, string? L
 [JsonSerializable(typeof(PutReplacedResponse))]
 [JsonSerializable(typeof(PutUnchangedResponse))]
 [JsonSerializable(typeof(ConflictResponse))]
+[JsonSerializable(typeof(AckRequest))]
+[JsonSerializable(typeof(AckRecordedResponse))]
 internal sealed partial class ApiJsonContext : JsonSerializerContext;

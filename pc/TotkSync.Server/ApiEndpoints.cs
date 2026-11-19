@@ -6,23 +6,45 @@ namespace TotkSync.Server;
 
 internal static class ApiEndpoints
 {
+    private sealed record Handler(string Method, Func<HttpContext, Task> Handle);
+
     public static void Map(IEndpointRouteBuilder routes, ApiDeps deps)
     {
-        routes.Map("/status", context => AllowOnly(HttpMethods.Get, context, () => WriteStatus(context, deps)));
-        if (deps.Receiver is { } receiver)
+        routes.Map("/status", context => Dispatch(context, new Handler(HttpMethods.Get, ctx => WriteStatus(ctx, deps))));
+        var saveHandlers = SaveHandlers(deps);
+        if (saveHandlers.Length > 0)
         {
-            routes.Map("/save", context => AllowOnly(HttpMethods.Put, context, () => SaveEndpoint.PutAsync(context, receiver, deps.Time)));
+            routes.Map("/save", context => Dispatch(context, saveHandlers));
+        }
+        if (deps.Sender is { } sender)
+        {
+            routes.Map("/save/ack", context => Dispatch(context, new Handler(HttpMethods.Post, ctx => SendEndpoints.AckAsync(ctx, sender))));
         }
         routes.MapFallback("{*path}", context => ApiErrors.WriteAsync(context, StatusCodes.Status404NotFound, ApiErrors.NotFound));
     }
 
-    private static Task AllowOnly(string method, HttpContext context, Func<Task> handle)
+    private static Handler[] SaveHandlers(ApiDeps deps)
     {
-        if (HttpMethods.Equals(context.Request.Method, method))
+        var handlers = new List<Handler>();
+        if (deps.Sender is { } sender)
         {
-            return handle();
+            handlers.Add(new Handler(HttpMethods.Get, ctx => SendEndpoints.GetAsync(ctx, sender, deps.Time)));
         }
-        context.Response.Headers.Allow = method;
+        if (deps.Receiver is { } receiver)
+        {
+            handlers.Add(new Handler(HttpMethods.Put, ctx => SaveEndpoint.PutAsync(ctx, receiver, deps.Time)));
+        }
+        return handlers.ToArray();
+    }
+
+    private static Task Dispatch(HttpContext context, params Handler[] handlers)
+    {
+        var handler = handlers.FirstOrDefault(candidate => HttpMethods.Equals(context.Request.Method, candidate.Method));
+        if (handler is not null)
+        {
+            return handler.Handle(context);
+        }
+        context.Response.Headers.Allow = string.Join(", ", handlers.Select(candidate => candidate.Method));
         return ApiErrors.WriteAsync(context, StatusCodes.Status405MethodNotAllowed, ApiErrors.MethodNotAllowed);
     }
 

@@ -53,7 +53,8 @@ public static class Composition
             IPAddress.Any,
             LanAddresses.Detect,
             provider.GetRequiredService<SaveReceiver>(),
-            error => RecoveryLog.Append(provider.GetRequiredService<AppDataPaths>().ErrorLogFile, [error.ToString()], "Server error")));
+            error => RecoveryLog.Append(provider.GetRequiredService<AppDataPaths>().ErrorLogFile, [error.ToString()], "Server error"),
+            provider.GetRequiredService<SaveSender>()));
     }
 
     private static void AddGame(IServiceCollection services)
@@ -92,6 +93,7 @@ public static class Composition
             () => RecoverLeftovers(provider),
             notes => RecoveryLog.Append(provider.GetRequiredService<AppDataPaths>().ErrorLogFile, notes)));
         services.AddSingleton<SaveReceiver>();
+        services.AddSingleton<SaveSender>();
     }
 
     private static IReadOnlyList<string> RecoverLeftovers(IServiceProvider provider)

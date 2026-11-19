@@ -111,7 +111,7 @@ public sealed class PutSaveEndpointTests : IAsyncLifetime
         return _rig.Gate.IsBusy;
     }
 
-    private static byte[] ValidZip =>ZipBuilder.ContractZip("valid-save-tree.zip");
+    private static byte[] ValidZip => ZipBuilder.ContractZip("valid-save-tree.zip");
 
     [Fact]
     public async Task Valid_zip_gives_200_with_the_contract_shape_the_new_backup_name_and_fingerprint()

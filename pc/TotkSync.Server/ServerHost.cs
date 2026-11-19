@@ -28,7 +28,8 @@ public sealed class ServerHost(
     IPAddress listenAddress,
     Func<IReadOnlyList<IPAddress>> detectLanAddresses,
     SaveReceiver? receiver = null,
-    Action<Exception>? onServerError = null)
+    Action<Exception>? onServerError = null,
+    SaveSender? sender = null)
 {
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private LanServer? _server;
@@ -97,7 +98,7 @@ public sealed class ServerHost(
         var port = settings.Current.Port;
         Publish(ServerState.Starting(port));
         var addresses = await Task.Run(detectLanAddresses);
-        var deps = new ApiDeps(settings.Current.Token ?? "", status, activity, time, receiver, onServerError);
+        var deps = new ApiDeps(settings.Current.Token ?? "", status, activity, time, receiver, onServerError, sender);
         var result = await LanServer.StartAsync(listenAddress, port, deps);
         Publish(ToState(result, port, addresses));
     }

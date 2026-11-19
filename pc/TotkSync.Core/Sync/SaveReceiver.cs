@@ -84,7 +84,7 @@ public sealed class SaveReceiver(
 
     private async Task<ReceiveResult> WriteAsync(ValidatedSaveZip zip, bool isForced)
     {
-        var lookup = game.IsRunning() ? new SaveDirLookup(null, new ReceiveResult.GameRunning()) : LookUpSaveDir();
+        var lookup = game.IsRunning() ? new SaveDirRefusal(null, new ReceiveResult.GameRunning()) : LookUpSaveDir();
         if (lookup.Refusal is not null)
         {
             return lookup.Refusal;
@@ -199,20 +199,16 @@ public sealed class SaveReceiver(
         return result is ReceiveResult.Failed failed ? failed with { IsSaveChanged = true } : result;
     }
 
-    private SaveDirLookup LookUpSaveDir()
+    private SaveDirRefusal LookUpSaveDir()
     {
-        var current = settings.Current;
-        if (string.IsNullOrWhiteSpace(current.GameDir))
+        var lookup = SaveDirLookup.For(settings.Current);
+        return lookup switch
         {
-            return new SaveDirLookup(null, new ReceiveResult.NoSave());
-        }
-        return SaveLocator.Locate(current.GameDir, current.SaveDir) switch
-        {
-            LocateResult.Found found when SaveLayout.IsSaveDirectory(found.Dir) => new SaveDirLookup(found.Dir, null),
-            LocateResult.Several => new SaveDirLookup(null, new ReceiveResult.Failed(SeveralSaves)),
-            _ => new SaveDirLookup(null, new ReceiveResult.NoSave()),
+            { Dir: { } dir } => new SaveDirRefusal(dir, null),
+            { HasSeveral: true } => new SaveDirRefusal(null, new ReceiveResult.Failed(SeveralSaves)),
+            _ => new SaveDirRefusal(null, new ReceiveResult.NoSave()),
         };
     }
 
-    private sealed record SaveDirLookup(string? Dir, ReceiveResult? Refusal);
+    private sealed record SaveDirRefusal(string? Dir, ReceiveResult? Refusal);
 }

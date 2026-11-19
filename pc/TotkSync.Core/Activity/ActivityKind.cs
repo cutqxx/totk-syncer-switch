@@ -18,5 +18,10 @@ public enum ActivityKind
     GameRunning,
     Busy,
     WriteFailed,
+    SaveSent,
+    SyncConfirmed,
+    FingerprintMismatch,
+    BadRequest,
+    ReadFailed,
     Other,
 }

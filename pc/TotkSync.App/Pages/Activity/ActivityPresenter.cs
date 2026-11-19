@@ -42,6 +42,11 @@ public static class ActivityPresenter
             ActivityKind.GameRunning => "Rejected: TotK is running",
             ActivityKind.Busy => "Rejected: another transfer is in progress",
             ActivityKind.WriteFailed => "Save write failed",
+            ActivityKind.SaveSent => "Save sent to Switch",
+            ActivityKind.SyncConfirmed => "Sync confirmed by Switch",
+            ActivityKind.FingerprintMismatch => "Rejected: Switch confirmed a different save",
+            ActivityKind.BadRequest => "Rejected: malformed request",
+            ActivityKind.ReadFailed => "Save read failed",
             ActivityKind.Other => "Other response",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
@@ -49,6 +54,8 @@ public static class ActivityPresenter
 
     private static SymbolRegular Symbol(ActivityKind kind)
     {
-        return kind is ActivityKind.StatusOk or ActivityKind.SaveReplaced or ActivityKind.SaveUnchanged ? SymbolRegular.CheckmarkCircle16 : SymbolRegular.ErrorCircle16;
+        return kind is ActivityKind.StatusOk or ActivityKind.SaveReplaced or ActivityKind.SaveUnchanged or ActivityKind.SaveSent or ActivityKind.SyncConfirmed
+            ? SymbolRegular.CheckmarkCircle16
+            : SymbolRegular.ErrorCircle16;
     }
 }

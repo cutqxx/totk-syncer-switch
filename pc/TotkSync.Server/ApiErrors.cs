@@ -17,6 +17,9 @@ internal static class ApiErrors
     public const string Busy = "busy";
     public const string WriteFailed = "write_failed";
     public const string Conflict = "conflict";
+    public const string FingerprintMismatch = "fingerprint_mismatch";
+    public const string BadRequest = "bad_request";
+    public const string ReadFailed = "read_failed";
 
     public static Task WriteAsync(HttpContext context, int statusCode, string errorCode)
     {

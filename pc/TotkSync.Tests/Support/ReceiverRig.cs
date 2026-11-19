@@ -29,6 +29,7 @@ public sealed class ReceiverRig : IDisposable
         Backups = new BackupStore(BackupsDir, Ops, Time);
         Replacer = new MirrorReplacer(Ops, Game, SwapRetry.None);
         Receiver = new SaveReceiver(Settings, Game, Gate, Cache, Backups, Replacer, SyncState, Time);
+        Sender = new SaveSender(Settings, Game, Gate, Cache, SyncState, Time);
     }
 
     public TempDir Temp { get; }
@@ -62,6 +63,8 @@ public sealed class ReceiverRig : IDisposable
     public MirrorReplacer Replacer { get; }
 
     public SaveReceiver Receiver { get; }
+
+    public SaveSender Sender { get; }
 
     public LeftoverRecovery RealRecovery() => RecoveryWith(new FileOps());
 

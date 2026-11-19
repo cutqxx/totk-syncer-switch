@@ -85,6 +85,28 @@ Switch (`switch/source/core/config.c`) принимает этот файл ка
 
 Отказы 404/411/413/423 приходят до чтения тела (при `Expect: 100-continue` тело вообще не отправляется).
 
+## GET /save и POST /save/ack (слайс 2.1)
+
+`GET /save` отдаёт сейв ПК как `application/zip` с `Content-Length`: файлы и каталоги в корне, без мусора и без `.nx_save_meta.bin`. Архив проходит правила «Валидный ZIP сейва».
+Заголовки ответа 200:
+
+- `X-TotkSync-Fingerprint: sha256:<hex>`: отпечаток содержимого архива (равен отпечатку папки сейва в момент упаковки).
+- `X-TotkSync-Modified: <ISO 8601 с часовым поясом>`: в том же формате, что `save.modified` в `/status`.
+
+Отказы `GET /save`: 404 `api/error-no-save.json`, 423 `api/error-game-running.json`, 503 `api/error-busy.json` (идёт приём сейва), 500 `{"error":"read_failed","reason":"..."}` (сейв не прочитался или найдено несколько папок сейва). `GET /save` не меняет ни сейв, ни `state.json`.
+
+`POST /save/ack` с телом `{"fingerprint":"sha256:<hex>"}` (`Content-Length` от 1 до 1024 байт) Switch шлёт после успешной записи сейва:
+
+| Код | Файл | Когда |
+|---|---|---|
+| 200 | `api/ack-recorded.json` | отпечаток равен текущему отпечатку сейва ПК; записан `last_sync` с направлением `pc->switch` |
+| 400 | `api/error-bad-request.json` | тело не JSON, нет поля `fingerprint` или оно не вида `sha256:` + 64 строчных hex, нет `Content-Length` или он больше 1024 |
+| 404 | `api/error-no-save.json` | на ПК нет сейва |
+| 409 | `api/error-fingerprint-mismatch.json` | сейв ПК уже не тот, что ушёл на Switch; `state.json` не меняется |
+| 423 | `api/error-game-running.json` | запущен `totk.exe` |
+| 503 | `api/error-busy.json` | идёт другая передача |
+| 500 | `api/error-write-failed.json` (с `reason`) | `state.json` не записался |
+
 ## save-zip/
 
 Тестовые ZIP для правил «Валидный ZIP сейва». Создаются независимым скриптом (только стандартная библиотека Python, без кода лаунчера), результат детерминирован:

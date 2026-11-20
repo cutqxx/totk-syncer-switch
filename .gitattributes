@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.nro binary
+*.zip binary
+*.pem text eol=lf
+contracts/** binary
+*.sav binary

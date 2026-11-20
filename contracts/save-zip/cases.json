@@ -1,0 +1,284 @@
+[
+  {
+    "file": "valid-save-tree.zip",
+    "valid": true,
+    "reason": null,
+    "saved_files": [
+      "option.sav",
+      "picturebook/B.dat",
+      "picturebook/a-b.dat",
+      "picturebook/a.dat",
+      "picturebook/a/b.dat",
+      "picturebook/a_b.dat",
+      "slot_00/caption.sav",
+      "slot_00/direct_file_save_related.sav",
+      "slot_00/footprint.sav",
+      "slot_00/progress.sav",
+      "slot_01/caption.sav",
+      "slot_01/direct_file_save_related.sav",
+      "slot_01/footprint.sav",
+      "slot_01/progress.sav",
+      "slot_02/caption.sav",
+      "slot_02/direct_file_save_related.sav",
+      "slot_02/footprint.sav",
+      "slot_02/progress.sav",
+      "slot_03/caption.sav",
+      "slot_03/direct_file_save_related.sav",
+      "slot_03/footprint.sav",
+      "slot_03/progress.sav",
+      "slot_04/caption.sav",
+      "slot_04/direct_file_save_related.sav",
+      "slot_04/footprint.sav",
+      "slot_04/progress.sav",
+      "slot_05/caption.sav",
+      "slot_05/direct_file_save_related.sav",
+      "slot_05/footprint.sav",
+      "slot_05/progress.sav",
+      "storage/CacheStorageKey.dat"
+    ],
+    "saved_dirs": [
+      "album",
+      "picturebook",
+      "picturebook/a",
+      "slot_00",
+      "slot_01",
+      "slot_02",
+      "slot_03",
+      "slot_04",
+      "slot_05",
+      "storage"
+    ]
+  },
+  {
+    "file": "valid-from-switch.zip",
+    "valid": true,
+    "reason": null,
+    "saved_files": [
+      "option.sav",
+      "picturebook/B.dat",
+      "picturebook/a-b.dat",
+      "picturebook/a.dat",
+      "picturebook/a/b.dat",
+      "picturebook/a_b.dat",
+      "slot_00/caption.sav",
+      "slot_00/direct_file_save_related.sav",
+      "slot_00/footprint.sav",
+      "slot_00/progress.sav",
+      "slot_01/caption.sav",
+      "slot_01/direct_file_save_related.sav",
+      "slot_01/footprint.sav",
+      "slot_01/progress.sav",
+      "slot_02/caption.sav",
+      "slot_02/direct_file_save_related.sav",
+      "slot_02/footprint.sav",
+      "slot_02/progress.sav",
+      "slot_03/caption.sav",
+      "slot_03/direct_file_save_related.sav",
+      "slot_03/footprint.sav",
+      "slot_03/progress.sav",
+      "slot_04/caption.sav",
+      "slot_04/direct_file_save_related.sav",
+      "slot_04/footprint.sav",
+      "slot_04/progress.sav",
+      "slot_05/caption.sav",
+      "slot_05/direct_file_save_related.sav",
+      "slot_05/footprint.sav",
+      "slot_05/progress.sav",
+      "storage/CacheStorageKey.dat"
+    ],
+    "saved_dirs": [
+      "album",
+      "picturebook",
+      "picturebook/a",
+      "slot_00",
+      "slot_01",
+      "slot_02",
+      "slot_03",
+      "slot_04",
+      "slot_05",
+      "storage"
+    ]
+  },
+  {
+    "file": "valid-minimal.zip",
+    "valid": true,
+    "reason": null,
+    "saved_files": [
+      "option.sav",
+      "slot_00/progress.sav"
+    ],
+    "saved_dirs": []
+  },
+  {
+    "file": "valid-empty-dirs.zip",
+    "valid": true,
+    "reason": null,
+    "saved_files": [
+      "option.sav",
+      "slot_00/progress.sav"
+    ],
+    "saved_dirs": [
+      "album"
+    ]
+  },
+  {
+    "file": "valid-junk-extra.zip",
+    "valid": true,
+    "reason": null,
+    "saved_files": [
+      "option.sav",
+      "slot_00/progress.sav"
+    ],
+    "saved_dirs": []
+  },
+  {
+    "file": "valid-jksv-meta.zip",
+    "valid": true,
+    "reason": null,
+    "saved_files": [
+      "option.sav",
+      "slot_00/progress.sav"
+    ],
+    "saved_dirs": []
+  },
+  {
+    "file": "invalid-abs-path.zip",
+    "valid": false,
+    "reason": "unsafe path: /evil.sav"
+  },
+  {
+    "file": "invalid-dotdot.zip",
+    "valid": false,
+    "reason": "unsafe path: ../evil.sav"
+  },
+  {
+    "file": "invalid-dotdot-inner.zip",
+    "valid": false,
+    "reason": "unsafe path: slot_00/../evil.sav"
+  },
+  {
+    "file": "invalid-backslash.zip",
+    "valid": false,
+    "reason": "unsafe path: slot_01\\progress.sav"
+  },
+  {
+    "file": "invalid-drive-letter.zip",
+    "valid": false,
+    "reason": "unsafe path: C:/evil.sav"
+  },
+  {
+    "file": "invalid-stream-name.zip",
+    "valid": false,
+    "reason": "unsafe path: option.sav:stream"
+  },
+  {
+    "file": "invalid-reserved-name.zip",
+    "valid": false,
+    "reason": "unsafe path: slot_01/NUL"
+  },
+  {
+    "file": "invalid-trailing-dot.zip",
+    "valid": false,
+    "reason": "unsafe path: slot_01/caption.sav."
+  },
+  {
+    "file": "invalid-trailing-space.zip",
+    "valid": false,
+    "reason": "unsafe path: slot_01/caption.sav "
+  },
+  {
+    "file": "invalid-trailing-dot-dir.zip",
+    "valid": false,
+    "reason": "unsafe path: album./x.dat"
+  },
+  {
+    "file": "invalid-reserved-space-ext.zip",
+    "valid": false,
+    "reason": "unsafe path: slot_01/CON .txt"
+  },
+  {
+    "file": "invalid-reserved-spaces-ext.zip",
+    "valid": false,
+    "reason": "unsafe path: slot_01/nul  .dat"
+  },
+  {
+    "file": "invalid-symlink.zip",
+    "valid": false,
+    "reason": "symlink entry: slot_01/link"
+  },
+  {
+    "file": "invalid-dup.zip",
+    "valid": false,
+    "reason": "duplicate path: option.sav"
+  },
+  {
+    "file": "invalid-dup-case.zip",
+    "valid": false,
+    "reason": "duplicate path: Option.sav"
+  },
+  {
+    "file": "invalid-dup-dir-case.zip",
+    "valid": false,
+    "reason": "duplicate path: album"
+  },
+  {
+    "file": "invalid-file-and-dir.zip",
+    "valid": false,
+    "reason": "conflicting paths: album/x.sav"
+  },
+  {
+    "file": "invalid-no-option.zip",
+    "valid": false,
+    "reason": "missing option.sav"
+  },
+  {
+    "file": "invalid-no-progress.zip",
+    "valid": false,
+    "reason": "missing slot_0N/progress.sav"
+  },
+  {
+    "file": "invalid-wrapped-root.zip",
+    "valid": false,
+    "reason": "missing option.sav"
+  },
+  {
+    "file": "invalid-slot-out-of-range.zip",
+    "valid": false,
+    "reason": "missing slot_0N/progress.sav"
+  },
+  {
+    "file": "invalid-not-zip.zip",
+    "valid": false,
+    "reason": "not a zip file"
+  },
+  {
+    "file": "invalid-crc.zip",
+    "valid": false,
+    "reason": "bad CRC: option.sav"
+  },
+  {
+    "file": "invalid-too-many-entries.zip",
+    "valid": false,
+    "reason": "too many entries (max 1000)"
+  },
+  {
+    "file": "invalid-too-large.zip",
+    "valid": false,
+    "reason": "unpacked size over 64 MiB"
+  },
+  {
+    "file": "invalid-compression-bomb.zip",
+    "valid": false,
+    "reason": "suspicious compression ratio"
+  },
+  {
+    "file": "invalid-meta-other-title.zip",
+    "valid": false,
+    "reason": "save of another game"
+  },
+  {
+    "file": "invalid-meta-bad-magic.zip",
+    "valid": false,
+    "reason": "save of another game"
+  }
+]

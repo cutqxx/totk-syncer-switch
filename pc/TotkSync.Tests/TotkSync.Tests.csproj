@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TotkSync.Core\TotkSync.Core.csproj" />
+    <ProjectReference Include="..\TotkSync.Server\TotkSync.Server.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Presenter logic that lives in the WPF app but does not use WPF: compiled in here so it is testable on plain net10.0. -->
+    <Compile Include="..\TotkSync.App\Pages\Backups\BackupPresenter.cs" LinkBase="App" />
+    <Compile Include="..\TotkSync.App\Pages\Backups\BackupRowModel.cs" LinkBase="App" />
+    <Compile Include="..\TotkSync.App\Pages\Home\PlayCardPresenter.cs" LinkBase="App" />
+    <Compile Include="..\TotkSync.App\Pages\Home\PlayCardModel.cs" LinkBase="App" />
+    <Compile Include="..\TotkSync.App\Pages\Home\SaveCardPresenter.cs" LinkBase="App" />
+    <Compile Include="..\TotkSync.App\Pages\Home\SaveCardModel.cs" LinkBase="App" />
+    <Compile Include="..\TotkSync.App\Services\RecoveryLog.cs" LinkBase="App" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <None Include="..\..\contracts\**" LinkBase="contracts" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

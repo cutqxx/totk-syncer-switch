@@ -1,0 +1,113 @@
+<Page x:Class="TotkSync.App.Pages.Home.HomePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:controls="clr-namespace:TotkSync.App.Controls"
+      xmlns:home="clr-namespace:TotkSync.App.Pages.Home"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <controls:PageFrame Title="Home">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" DataContext="{Binding PlayCard}">
+                <ui:InfoBar Margin="{StaticResource Space.BottomSM}"
+                            AutomationProperties.LiveSetting="Polite"
+                            IsClosable="False"
+                            IsOpen="{Binding IsGameRunning, Mode=OneWay}"
+                            Message="Sync is paused until you close the game. The Switch can't send or get saves meanwhile."
+                            Severity="Informational"
+                            Title="TotK is running" />
+                <ui:InfoBar Margin="{StaticResource Space.BottomSM}"
+                            AutomationProperties.LiveSetting="Assertive"
+                            IsClosable="True"
+                            IsOpen="{Binding HasLaunchError, Mode=TwoWay}"
+                            Message="{Binding LaunchError}"
+                            Severity="Error"
+                            Title="Couldn't start totk.exe" />
+                <ui:InfoBar Margin="{StaticResource Space.BottomSM}"
+                            AutomationProperties.LiveSetting="Polite"
+                            IsClosable="True"
+                            IsOpen="{Binding HasNewProgress, Mode=TwoWay}"
+                            Message="{Binding NewProgressMessage}"
+                            Severity="Informational"
+                            Title="PC save has new progress" />
+            </StackPanel>
+
+            <home:PlayCardView x:Name="PlayCardHost"
+                               Grid.Row="1"
+                               Margin="{StaticResource Space.BottomM}"
+                               DataContext="{Binding PlayCard}"
+                               Visibility="{Binding DataContext.IsSaveCardVisible, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}" />
+
+            <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="2*" MinWidth="280" />
+            </Grid.ColumnDefinitions>
+            <home:ServerCardView Grid.Column="2" DataContext="{Binding ServerCard}" VerticalAlignment="Top" />
+            <StackPanel Grid.Column="0">
+            <StackPanel Orientation="Horizontal"
+                        Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}">
+                <ui:ProgressRing Width="20" Height="20" IsIndeterminate="True" />
+                <TextBlock Margin="{StaticResource Space.LeftS}"
+                           VerticalAlignment="Center"
+                           Text="Checking the PC save…" />
+            </StackPanel>
+
+            <ui:Card Padding="{StaticResource Space.HeroPadding}"
+                     Visibility="{Binding IsSetupVisible, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <ui:TextBlock FontTypography="Subtitle" Text="Set up TotK Save Sync" />
+
+                    <ui:TextBlock Margin="{StaticResource Space.TopL}"
+                                  FontTypography="BodyStrong"
+                                  Text="1. Choose your TotK PC folder" />
+                    <TextBlock Margin="{StaticResource Space.TopXS}" Text="Pick the folder that contains totk.exe." />
+                    <ui:Button x:Name="ChooseFolderButton"
+                               Margin="{StaticResource Space.TopSM}"
+                               HorizontalAlignment="Left"
+                               Appearance="Primary"
+                               Command="{Binding ChooseFolderCommand}"
+                               Content="Choose folder…"
+                               Icon="{ui:SymbolIcon Folder24}" />
+                    <controls:FieldError Message="{Binding GameFolderError}" />
+                    <home:SaveResultView Margin="{StaticResource Space.TopM}"
+                                         Visibility="{Binding IsConfigured, Converter={StaticResource BoolToVisibility}}" />
+
+                    <ui:TextBlock Margin="{StaticResource Space.TopL}"
+                                  FontTypography="BodyStrong"
+                                  Text="2. Connect your Switch" />
+                    <TextBlock Margin="{StaticResource Space.TopXS}"
+                               Text="Save switch-config.json and copy it to the SD card as sd:/config/totk-sync/config.json. Then use &quot;Send to PC&quot; on the Switch."
+                               TextWrapping="Wrap" />
+                    <ui:Button Margin="{StaticResource Space.TopM}"
+                               HorizontalAlignment="Right"
+                               Appearance="Secondary"
+                               Command="{Binding FinishSetupCommand}"
+                               Content="Done"
+                               Visibility="{Binding IsConfigured, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </ui:Card>
+
+            <ui:Card Padding="{StaticResource Space.CardPadding}"
+                     Visibility="{Binding IsSaveCardVisible, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <StackPanel Margin="{StaticResource Space.BottomSM}" Orientation="Horizontal">
+                        <ui:SymbolIcon FontSize="20" Symbol="Save20" />
+                        <ui:TextBlock Margin="{StaticResource Space.LeftS}"
+                                      VerticalAlignment="Center"
+                                      FontTypography="BodyStrong"
+                                      Text="PC save" />
+                    </StackPanel>
+                    <home:SaveResultView />
+                </StackPanel>
+            </ui:Card>
+            </StackPanel>
+            </Grid>
+        </Grid>
+    </controls:PageFrame>
+</Page>

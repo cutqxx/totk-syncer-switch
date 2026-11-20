@@ -38,11 +38,6 @@
                       ItemsSource="{Binding Rows}"
                       ScrollViewer.VerticalScrollBarVisibility="Disabled"
                       Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}">
-                <ListView.ItemContainerStyle>
-                    <Style BasedOn="{StaticResource {x:Type ListViewItem}}" TargetType="{x:Type ListViewItem}">
-                        <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
-                    </Style>
-                </ListView.ItemContainerStyle>
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Width="150" Header="Date">

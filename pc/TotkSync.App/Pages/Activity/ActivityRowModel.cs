@@ -11,4 +11,8 @@ public sealed record ActivityRowModel(
     string ResultText,
     string CodeText,
     SymbolRegular Symbol,
-    string AutomationName);
+    string AutomationName)
+{
+    /// <summary>A screen reader names a list row by its item's text, so the row reads as <see cref="AutomationName"/>.</summary>
+    public override string ToString() => AutomationName;
+}

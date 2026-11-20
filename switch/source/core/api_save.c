@@ -48,6 +48,22 @@ static bool is_error_document(const http_response_t *resp, const char *error_nam
     return is_expected;
 }
 
+static void read_last_sync(const http_response_t *resp, api_get_result_t *out)
+{
+    char value[HEADER_VALUE_SIZE];
+    out->last_sync = API_LAST_SYNC_UNKNOWN;
+    out->last_sync_fingerprint[0] = '\0';
+    if (!http_response_header_value(resp, API_LAST_SYNC_HEADER, value, sizeof value)) {
+        return;
+    }
+    if (strcmp(value, API_NEVER_SYNCED) == 0) {
+        out->last_sync = API_LAST_SYNC_NONE;
+    } else if (api_is_fingerprint(value)) {
+        out->last_sync = API_LAST_SYNC_KNOWN;
+        memcpy(out->last_sync_fingerprint, value, strlen(value) + 1); /* exactly 71 characters */
+    }
+}
+
 static api_get_kind_t interpret_zip(const http_response_t *resp, api_get_result_t *out)
 {
     char content_type[HEADER_VALUE_SIZE];
@@ -64,6 +80,7 @@ static api_get_kind_t interpret_zip(const http_response_t *resp, api_get_result_
         return API_GET_BAD_RESPONSE;
     }
     memcpy(out->fingerprint, fingerprint, strlen(fingerprint) + 1); /* api_is_fingerprint: exactly 71 characters */
+    read_last_sync(resp, out);
     return API_GET_OK;
 }
 

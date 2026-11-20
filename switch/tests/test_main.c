@@ -19,6 +19,7 @@ void run_main_screen_tests(void);
 void run_pc_status_tests(void);
 void run_redact_tests(void);
 void run_retry_tests(void);
+void run_save_fingerprint_tests(void);
 void run_save_pack_tests(void);
 void run_save_rules_tests(void);
 void run_save_validate_tests(void);
@@ -28,6 +29,7 @@ void run_api_save_tests(void);
 void run_get_from_pc_tests(void);
 void run_send_conflict_tests(void);
 void run_send_to_pc_tests(void);
+void run_sha256_tests(void);
 void run_text_and_repo_rule_tests(void);
 void run_zip_writer_tests(void);
 
@@ -55,6 +57,8 @@ int main(void)
     run_api_put_tests();
     run_zip_writer_tests();
     run_save_pack_tests();
+    run_sha256_tests();
+    run_save_fingerprint_tests();
     run_send_to_pc_tests();
     run_send_conflict_tests();
     run_text_and_repo_rule_tests();

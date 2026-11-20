@@ -45,6 +45,35 @@ static void a_zip_with_both_headers_is_ok_and_keeps_the_fingerprint_and_date(voi
     CHECK_STR_EQ(out.modified, "2026-11-03 14:25");
 }
 
+#define ZIP_HEADERS_WITH_LAST_SYNC(value)                                                                                \
+    "HTTP/1.1 200 OK\r\nX-TotkSync-Api: 1\r\nContent-Type: application/zip\r\nContent-Length: 4\r\n"                    \
+    "X-TotkSync-Fingerprint: " FINGERPRINT "\r\nX-TotkSync-Modified: 2026-11-03T14:25:01+03:00\r\n"                     \
+    "X-TotkSync-Last-Sync: " value "\r\n\r\n"
+#define LAST_SYNC "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+static void the_last_sync_header_is_read_as_a_fingerprint_none_or_unknown(void)
+{
+    api_get_result_t out;
+    interpret(200, 0, ZIP_HEADERS_WITH_LAST_SYNC(LAST_SYNC), "PK..", &out);
+    CHECK_INT_EQ(out.kind, API_GET_OK);
+    CHECK_INT_EQ(out.last_sync, API_LAST_SYNC_KNOWN);
+    CHECK_STR_EQ(out.last_sync_fingerprint, LAST_SYNC);
+
+    interpret(200, 0, ZIP_HEADERS_WITH_LAST_SYNC("none"), "PK..", &out);
+    CHECK_INT_EQ(out.kind, API_GET_OK);
+    CHECK_INT_EQ(out.last_sync, API_LAST_SYNC_NONE);
+    CHECK_STR_EQ(out.last_sync_fingerprint, "");
+
+    interpret(200, 0, ZIP_HEADERS, "PK..", &out); /* older launcher, or its state.json is unreadable */
+    CHECK_INT_EQ(out.kind, API_GET_OK);
+    CHECK_INT_EQ(out.last_sync, API_LAST_SYNC_UNKNOWN);
+
+    interpret(200, 0, ZIP_HEADERS_WITH_LAST_SYNC("sha256:ABC"), "PK..", &out); /* malformed: the save still comes */
+    CHECK_INT_EQ(out.kind, API_GET_OK);
+    CHECK_INT_EQ(out.last_sync, API_LAST_SYNC_UNKNOWN);
+    CHECK_STR_EQ(out.last_sync_fingerprint, "");
+}
+
 static void a_200_without_a_valid_header_or_body_is_a_bad_response(void)
 {
     static const char *const headers[] = {
@@ -178,6 +207,7 @@ void run_api_save_tests(void)
 {
     RUN_TEST(get_save_request_has_the_url_token_and_room_for_a_whole_save);
     RUN_TEST(a_zip_with_both_headers_is_ok_and_keeps_the_fingerprint_and_date);
+    RUN_TEST(the_last_sync_header_is_read_as_a_fingerprint_none_or_unknown);
     RUN_TEST(a_200_without_a_valid_header_or_body_is_a_bad_response);
     RUN_TEST(refusals_from_the_launcher_are_told_apart);
     RUN_TEST(transport_failures_and_foreign_servers_are_classified);

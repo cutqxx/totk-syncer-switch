@@ -11,6 +11,15 @@
 
 #define API_FINGERPRINT_HEADER "X-TotkSync-Fingerprint"
 #define API_MODIFIED_HEADER "X-TotkSync-Modified"
+#define API_LAST_SYNC_HEADER "X-TotkSync-Last-Sync"
+#define API_NEVER_SYNCED "none"
+
+/* What the launcher said about the last sync (slice 3.1). */
+typedef enum {
+    API_LAST_SYNC_UNKNOWN, /* no header, or not a fingerprint: an older launcher or an unreadable state.json */
+    API_LAST_SYNC_NONE,    /* "none": never synced */
+    API_LAST_SYNC_KNOWN    /* last_sync_fingerprint holds the fingerprint of the last sync in either direction */
+} api_last_sync_t;
 
 typedef enum {
     API_GET_OK,            /* 200, marker, application/zip, a fingerprint and a modified header, a non-empty body */
@@ -34,6 +43,8 @@ typedef struct {
     char fingerprint[API_PUT_FINGERPRINT_SIZE]; /* API_GET_OK */
     char modified[API_MODIFIED_SIZE];           /* API_GET_OK: "YYYY-MM-DD HH:MM" */
     char reason[API_PUT_REASON_SIZE];           /* API_GET_READ_FAILED, printable ASCII */
+    api_last_sync_t last_sync;                  /* API_GET_OK */
+    char last_sync_fingerprint[API_PUT_FINGERPRINT_SIZE]; /* API_LAST_SYNC_KNOWN */
 } api_get_result_t;
 
 /* GET http://<pc_host>:<pc_port>/save with Authorization. The answer may be as large as a save ZIP (64 MiB), and the

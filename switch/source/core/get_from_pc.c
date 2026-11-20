@@ -5,11 +5,13 @@
 #include <string.h>
 
 #include "api_save.h"
+#include "ascii_text.h"
 #include "backup_to_sd.h"
 #include "env_log.h"
 #include "paths.h"
 #include "redact.h"
 #include "retry.h"
+#include "save_fingerprint.h"
 #include "save_steps.h"
 #include "save_validate.h"
 #include "save_write.h"
@@ -139,10 +141,74 @@ static bool check_zip(pull_t *p)
     return true;
 }
 
+/* --- progress on the Switch that never reached the PC (slice 3.1) ---------------------------------------------- */
+
+/* The Switch save is "sent" when it equals the last sync (either direction) or the PC save itself. */
+static unsent_t judge_unsent(const char *switch_fingerprint, const api_get_result_t *answer)
+{
+    if (switch_fingerprint[0] == '\0') {
+        return UNSENT_UNKNOWN;
+    }
+    if (strcmp(switch_fingerprint, answer->fingerprint) == 0) {
+        return UNSENT_NONE;
+    }
+    switch (answer->last_sync) {
+    case API_LAST_SYNC_KNOWN:
+        return strcmp(switch_fingerprint, answer->last_sync_fingerprint) == 0 ? UNSENT_NONE : UNSENT_FOUND;
+    case API_LAST_SYNC_NONE: return UNSENT_FOUND;
+    default: return UNSENT_UNKNOWN;
+    }
+}
+
+/* Mounts the save read-only just long enough to fingerprint it; out stays empty when that fails. */
+static void fingerprint_switch_save(pull_t *p, char out[SAVE_FINGERPRINT_SIZE])
+{
+    const console_port_t *console = p->env->console;
+    char root[TS_PATH_SIZE];
+    char problem[TS_PATH_SIZE];
+    char shown[TS_PATH_SIZE];
+    uint32_t error_code = 0;
+    out[0] = '\0';
+    save_steps_show(p->env, "%s", TXT_STEP_CHECKING_UNSENT);
+    if (!console->mount_save_readonly(console->ctx, &p->account, root, sizeof root, &error_code)) {
+        log_note(p, "Switch save fingerprint: mount failed (error 0x%x)", (unsigned)error_code);
+        return;
+    }
+    tree_status_t status = save_fingerprint_dir(root, out, problem, sizeof problem);
+    console->unmount_save(console->ctx);
+    if (status != TREE_OK) {
+        ascii_copy(problem, shown, sizeof shown);
+        log_note(p, "Switch save fingerprint failed (%d) at '%s'", (int)status, shown);
+    }
+}
+
+static void check_unsent_progress(pull_t *p)
+{
+    static const char *const LAST_SYNC_TEXT[] = { "unknown", "none", "known" };
+    char switch_fingerprint[SAVE_FINGERPRINT_SIZE];
+    fingerprint_switch_save(p, switch_fingerprint);
+    p->out->unsent = judge_unsent(switch_fingerprint, &p->answer);
+    log_note(p, "Unsent progress check: Switch %s, last sync %s %s, PC %s -> %s",
+             switch_fingerprint[0] != '\0' ? switch_fingerprint : "unknown", LAST_SYNC_TEXT[p->answer.last_sync],
+             p->answer.last_sync_fingerprint, p->answer.fingerprint,
+             p->out->unsent == UNSENT_FOUND ? "NOT SENT" : p->out->unsent == UNSENT_NONE ? "sent" : "unknown");
+}
+
+static const char *unsent_warning(unsent_t unsent)
+{
+    switch (unsent) {
+    case UNSENT_FOUND: return TXT_WARN_UNSENT_PROGRESS "\n";
+    case UNSENT_UNKNOWN: return TXT_WARN_UNSENT_UNKNOWN "\n";
+    default: return "";
+    }
+}
+
 static bool user_wants_restore(pull_t *p)
 {
     char prompt[TS_LINE_SIZE];
-    snprintf(prompt, sizeof prompt, TXT_PROMPT_RESTORE, p->answer.modified, p->stats.files, to_kb(p->stats.total_bytes));
+    check_unsent_progress(p);
+    snprintf(prompt, sizeof prompt, "%s" TXT_PROMPT_RESTORE, unsent_warning(p->out->unsent), p->answer.modified,
+             p->stats.files, to_kb(p->stats.total_bytes));
     if (!p->env->ui->confirm(p->env->ui->ctx, prompt)) {
         return fail(p, PULL_CANCELLED, TXT_MSG_CANCELLED, TXT_SWITCH_SAVE_NOT_CHANGED);
     }

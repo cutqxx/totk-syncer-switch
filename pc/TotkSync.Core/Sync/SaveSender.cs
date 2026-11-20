@@ -1,3 +1,4 @@
+using System.Text.Json;
 using TotkSync.Core.Game;
 using TotkSync.Core.Replace;
 using TotkSync.Core.Saves;
@@ -88,7 +89,7 @@ public sealed class SaveSender(
         }
     }
 
-    private static SendResult Pack(string saveDir)
+    private SendResult Pack(string saveDir)
     {
         try
         {
@@ -96,7 +97,7 @@ public sealed class SaveSender(
             var zip = SaveZipPacker.Pack(saveDir);
             return SaveZipValidator.Validate(zip) switch
             {
-                ZipValidation.Valid valid => new SendResult.Sent(zip, Fingerprint.OfZip(valid.Zip), modified),
+                ZipValidation.Valid valid => Sent(zip, Fingerprint.OfZip(valid.Zip), modified),
                 ZipValidation.Invalid invalid => new SendResult.Failed($"the PC save can't be sent: {invalid.Reason}"),
                 var other => throw new InvalidOperationException($"Unknown validation result {other}"),
             };
@@ -104,6 +105,19 @@ public sealed class SaveSender(
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             return new SendResult.Failed($"couldn't read the PC save: {error.Message}");
+        }
+    }
+
+    /// <summary>The Switch compares its own save with the last sync to warn about progress it never sent.</summary>
+    private SendResult.Sent Sent(byte[] zip, string fingerprint, DateTimeOffset modified)
+    {
+        try
+        {
+            return new SendResult.Sent(zip, fingerprint, modified, syncState.Load()?.Fingerprint, IsLastSyncKnown: true);
+        }
+        catch (Exception error) when (error is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return new SendResult.Sent(zip, fingerprint, modified, LastSync: null, IsLastSyncKnown: false);
         }
     }
 }

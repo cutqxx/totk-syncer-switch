@@ -11,7 +11,6 @@
 #include "save_pack.h"
 #include "test.h"
 #include "test_fs.h"
-#include "test_sha256.h"
 #include "test_support.h"
 #include "test_zip_read.h"
 
@@ -124,18 +123,6 @@ static void make_numbered_directories(const char *root, int count)
         snprintf(name, sizeof name, "d%04d", i);
         CHECK(test_fs_make_dir(root, name));
     }
-}
-
-static void the_test_sha256_matches_the_published_vectors(void)
-{
-    char hash[65];
-    const char two_blocks[] = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-    test_sha256_hex("", 0, hash);
-    CHECK_STR_EQ(hash, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
-    test_sha256_hex("abc", 3, hash);
-    CHECK_STR_EQ(hash, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-    test_sha256_hex(two_blocks, strlen(two_blocks), hash);
-    CHECK_STR_EQ(hash, "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
 }
 
 /* ---- contract: the Switch ZIP of save-tree is what the PC expects ---- */
@@ -699,7 +686,6 @@ static void a_missing_save_root_is_a_read_failure(void)
 
 void run_save_pack_tests(void)
 {
-    RUN_TEST(the_test_sha256_matches_the_published_vectors);
     RUN_TEST(the_zip_holds_the_contract_directories_first_then_the_contract_files_in_byte_order);
     RUN_TEST(every_file_in_the_zip_has_the_bytes_of_the_save_file);
     RUN_TEST(the_zip_has_no_junk_and_no_meta_file);

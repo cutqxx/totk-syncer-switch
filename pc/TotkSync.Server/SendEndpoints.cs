@@ -11,6 +11,10 @@ internal static partial class SendEndpoints
 {
     public const string FingerprintHeader = "X-TotkSync-Fingerprint";
     public const string ModifiedHeader = "X-TotkSync-Modified";
+
+    /// <summary>The last sync's fingerprint, or "none" when never synced; left out when the sync state is unreadable.</summary>
+    public const string LastSyncHeader = "X-TotkSync-Last-Sync";
+    public const string NeverSynced = "none";
     private const string ZipContentType = "application/zip";
     private const int MaxAckBytes = 1024;
     private static readonly TimeSpan AckReadTimeout = TimeSpan.FromSeconds(10);
@@ -72,6 +76,10 @@ internal static partial class SendEndpoints
         response.ContentLength = sent.Zip.Length;
         response.Headers[FingerprintHeader] = sent.Fingerprint;
         response.Headers[ModifiedHeader] = StatusMapping.FormatDate(sent.Modified, time);
+        if (sent.IsLastSyncKnown)
+        {
+            response.Headers[LastSyncHeader] = sent.LastSync ?? NeverSynced;
+        }
         await response.Body.WriteAsync(sent.Zip, context.RequestAborted);
     }
 

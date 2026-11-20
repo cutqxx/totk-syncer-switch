@@ -92,6 +92,7 @@ Switch (`switch/source/core/config.c`) принимает этот файл ка
 
 - `X-TotkSync-Fingerprint: sha256:<hex>`: отпечаток содержимого архива (равен отпечатку папки сейва в момент упаковки).
 - `X-TotkSync-Modified: <ISO 8601 с часовым поясом>`: в том же формате, что `save.modified` в `/status`.
+- `X-TotkSync-Last-Sync: sha256:<hex>` или `none` (слайс 3.1): отпечаток последней синхронизации в любую сторону (`last_sync.fingerprint` из `/status`), `none`, если синхронизаций не было. Если `state.json` не читается, заголовка нет. Switch сравнивает с ним отпечаток своего сейва и предупреждает о прогрессе, не отправленном на ПК.
 
 Отказы `GET /save`: 404 `api/error-no-save.json`, 423 `api/error-game-running.json`, 503 `api/error-busy.json` (идёт приём сейва), 500 `{"error":"read_failed","reason":"..."}` (сейв не прочитался или найдено несколько папок сейва). `GET /save` не меняет ни сейв, ни `state.json`.
 

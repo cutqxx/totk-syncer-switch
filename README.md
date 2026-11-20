@@ -291,6 +291,6 @@ pwsh -File build.ps1 test-all    # test + pc-test
 
 ### Слайс 3.1: предупреждение о неотправленном прогрессе
 
-- [ ] Сразу после `Send to PC` или «Get from PC» вопрос `Restore to Switch?` идёт без предупреждения.
-- [ ] Сыграть на Switch и сохраниться, затем «Get from PC»: над вопросом строка `Switch save has progress not sent to PC!`. По B ничего не меняется.
-- [ ] Проверка отпечатка не задерживает заметно (в `log.txt` строка `Unsent progress check: ...` с результатом `sent` / `NOT SENT`).
+- [x] Сразу после `Send to PC` или «Get from PC» вопрос `Restore to Switch?` идёт без предупреждения.
+- [x] Сыграть на Switch и сохраниться, затем «Get from PC»: над вопросом строка `Switch save has progress not sent to PC!`. По B ничего не меняется.
+- [x] Проверка отпечатка не задерживает заметно (в `log.txt` строка `Unsent progress check: ...` с результатом `sent` / `NOT SENT`).

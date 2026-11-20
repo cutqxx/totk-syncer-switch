@@ -1,74 +1,70 @@
-#include "test_sha256.h"
-
-#include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static const uint32_t ROUND_CONSTANTS[64] = {
-    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-};
+#include "sha256.h"
+#include "test.h"
 
-static uint32_t rotate_right(uint32_t value, int bits)
+#define TWO_BLOCKS "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
+
+static void sha256_matches_the_published_vectors(void)
 {
-    return (value >> bits) | (value << (32 - bits));
+    char hash[SHA256_HEX_SIZE];
+    sha256_hex("", 0, hash);
+    CHECK_STR_EQ(hash, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    sha256_hex("abc", 3, hash);
+    CHECK_STR_EQ(hash, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    sha256_hex(TWO_BLOCKS, strlen(TWO_BLOCKS), hash);
+    CHECK_STR_EQ(hash, "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
 }
 
-static void process_block(uint32_t state[8], const unsigned char block[64])
+static void a_million_a_streamed_in_odd_pieces_matches_the_published_vector(void)
 {
-    uint32_t w[64];
-    for (int i = 0; i < 16; i++) {
-        w[i] = (uint32_t)block[i * 4] << 24 | (uint32_t)block[i * 4 + 1] << 16 | (uint32_t)block[i * 4 + 2] << 8
-               | (uint32_t)block[i * 4 + 3];
+    char block[1024]; /* pieces go up to 1009 bytes */
+    memset(block, 'a', sizeof block);
+    sha256_t hash;
+    sha256_init(&hash);
+    size_t left = 1000000;
+    size_t piece = 1;
+    while (left > 0) {
+        size_t take = piece < left ? piece : left;
+        sha256_update(&hash, block, take);
+        left -= take;
+        piece = piece % 997 + 13; /* sizes cross every block boundary */
     }
-    for (int i = 16; i < 64; i++) {
-        uint32_t s0 = rotate_right(w[i - 15], 7) ^ rotate_right(w[i - 15], 18) ^ (w[i - 15] >> 3);
-        uint32_t s1 = rotate_right(w[i - 2], 17) ^ rotate_right(w[i - 2], 19) ^ (w[i - 2] >> 10);
-        w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+    unsigned char digest[SHA256_DIGEST_SIZE];
+    char hex[SHA256_HEX_SIZE];
+    sha256_final(&hash, digest);
+    sha256_to_hex(digest, hex);
+    CHECK_STR_EQ(hex, "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0");
+}
+
+static void every_split_of_a_message_gives_the_same_hash(void)
+{
+    /* Lengths around the 56-byte padding edge and the 64-byte block edge. */
+    unsigned char message[130];
+    for (size_t i = 0; i < sizeof message; i++) {
+        message[i] = (unsigned char)(i * 7 + 3);
     }
-    uint32_t v[8];
-    memcpy(v, state, sizeof v);
-    for (int i = 0; i < 64; i++) {
-        uint32_t s1 = rotate_right(v[4], 6) ^ rotate_right(v[4], 11) ^ rotate_right(v[4], 25);
-        uint32_t choice = (v[4] & v[5]) ^ (~v[4] & v[6]);
-        uint32_t temp1 = v[7] + s1 + choice + ROUND_CONSTANTS[i] + w[i];
-        uint32_t s0 = rotate_right(v[0], 2) ^ rotate_right(v[0], 13) ^ rotate_right(v[0], 22);
-        uint32_t majority = (v[0] & v[1]) ^ (v[0] & v[2]) ^ (v[1] & v[2]);
-        uint32_t temp2 = s0 + majority;
-        memmove(v + 1, v, 7 * sizeof v[0]);
-        v[4] += temp1;
-        v[0] = temp1 + temp2;
-    }
-    for (int i = 0; i < 8; i++) {
-        state[i] += v[i];
+    for (size_t length = 54; length <= 130; length++) {
+        char whole[SHA256_HEX_SIZE];
+        sha256_hex(message, length, whole);
+        for (size_t split = 0; split <= length; split += 9) {
+            sha256_t hash;
+            unsigned char digest[SHA256_DIGEST_SIZE];
+            char parts[SHA256_HEX_SIZE];
+            sha256_init(&hash);
+            sha256_update(&hash, message, split);
+            sha256_update(&hash, message + split, length - split);
+            sha256_final(&hash, digest);
+            sha256_to_hex(digest, parts);
+            CHECK_STR_EQ(parts, whole);
+        }
     }
 }
 
-void test_sha256_hex(const void *data, size_t size, char out[65])
+void run_sha256_tests(void)
 {
-    uint32_t state[8] = { 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19 };
-    size_t padded_size = ((size + 8) / 64 + 1) * 64;
-    unsigned char *padded = calloc(padded_size, 1);
-    if (size > 0) {
-        memcpy(padded, data, size);
-    }
-    padded[size] = 0x80;
-    uint64_t bit_length = (uint64_t)size * 8;
-    for (int i = 0; i < 8; i++) {
-        padded[padded_size - 1 - (size_t)i] = (unsigned char)(bit_length >> (8 * i));
-    }
-    for (size_t offset = 0; offset < padded_size; offset += 64) {
-        process_block(state, padded + offset);
-    }
-    for (int i = 0; i < 8; i++) {
-        snprintf(out + i * 8, 9, "%08x", (unsigned)state[i]);
-    }
-    free(padded);
+    RUN_TEST(sha256_matches_the_published_vectors);
+    RUN_TEST(a_million_a_streamed_in_odd_pieces_matches_the_published_vector);
+    RUN_TEST(every_split_of_a_message_gives_the_same_hash);
 }

@@ -109,6 +109,40 @@ public sealed class GetSaveEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Get_save_says_none_as_the_last_sync_when_the_save_was_never_synced()
+    {
+        using var response = await GetSaveAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("none", Header(response, "X-TotkSync-Last-Sync"));
+    }
+
+    [Theory]
+    [InlineData(SyncDirection.SwitchToPc)]
+    [InlineData(SyncDirection.PcToSwitch)]
+    public async Task Get_save_hands_over_the_last_sync_fingerprint_whatever_its_direction(SyncDirection direction)
+    {
+        _rig.SyncState.Save(new LastSync(OtherFingerprint, ReceiverRig.FakeNow, direction));
+
+        using var response = await GetSaveAsync();
+
+        Assert.Equal(OtherFingerprint, Header(response, "X-TotkSync-Last-Sync"));
+    }
+
+    [Fact]
+    public async Task Get_save_still_sends_the_save_but_leaves_out_the_last_sync_when_the_sync_state_is_unreadable()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(StatePath)!);
+        File.WriteAllText(StatePath, "{ not json");
+
+        using var response = await GetSaveAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(response.Headers.Contains("X-TotkSync-Last-Sync"));
+        Assert.Equal(Fingerprint.OfDirectory(_rig.SaveDir), Header(response, "X-TotkSync-Fingerprint"));
+    }
+
+    [Fact]
     public async Task The_zip_is_a_valid_save_zip_whose_files_match_the_pc_save_byte_for_byte()
     {
         using var response = await GetSaveAsync();

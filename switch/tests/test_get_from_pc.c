@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 
 #include "get_from_pc.h"
+#include "save_fingerprint.h"
 #include "test.h"
 #include "test_fs.h"
 #include "test_support.h"
@@ -32,8 +33,23 @@ typedef struct {
     char sd[256];
     char save_before[IDENTITY_SIZE];
     char pc_save[IDENTITY_SIZE];
+    char zip_headers[512];
+    char switch_fingerprint[SAVE_FINGERPRINT_SIZE];
     pull_result_t result;
 } pull_fixture_t;
+
+/* GET /save answers with X-TotkSync-Last-Sync: value; NULL leaves the header out (an older launcher). */
+static void use_last_sync(pull_fixture_t *f, const char *value)
+{
+    if (value == NULL) {
+        snprintf(f->zip_headers, sizeof f->zip_headers, "%s", ZIP_HEADERS);
+    } else {
+        size_t head = strlen(ZIP_HEADERS) - 2; /* without the blank line */
+        snprintf(f->zip_headers, sizeof f->zip_headers, "%.*sX-TotkSync-Last-Sync: %s\r\n\r\n", (int)head, ZIP_HEADERS,
+                 value);
+    }
+    f->script[0].headers = f->zip_headers;
+}
 
 static unsigned char *read_bytes(const char *path, size_t *size)
 {
@@ -89,6 +105,10 @@ static void fixture_open(pull_fixture_t *f)
     char contract_save[256];
     CHECK(test_fs_make_contract_save(contract_save, sizeof contract_save));
     test_tree_identity(contract_save, f->pc_save, sizeof f->pc_save);
+    /* By default the Switch save is the one last synced: no warning at the question. */
+    char problem[TS_PATH_SIZE];
+    CHECK_INT_EQ(save_fingerprint_dir(f->save, f->switch_fingerprint, problem, sizeof problem), TREE_OK);
+    use_last_sync(f, f->switch_fingerprint);
 }
 
 static void fixture_close(pull_fixture_t *f)
@@ -198,7 +218,7 @@ static void a_verified_before_pull_backup_of_the_old_save_is_made_before_writing
     test_zip_t listing;
     CHECK(test_zip_open(backup.data, (size_t)backup.size, &listing));
     CHECK(test_zip_find(&listing, "slot_03/only-on-switch.sav") != NULL);
-    CHECK_INT_EQ(f.console.mount_calls, 1);
+    CHECK_INT_EQ(f.console.mount_calls, 2); /* read-only: the unsent-progress check, then the backup */
     CHECK_INT_EQ(f.console.rw_mount_calls, 1);
     test_zip_close(&listing);
     body_free(&backup);
@@ -216,7 +236,8 @@ static void b_at_the_question_changes_nothing_and_makes_no_backup(void)
     CHECK_INT_EQ(f.result.kind, PULL_CANCELLED);
     CHECK_STR_EQ(f.result.message, "Cancelled. " NOT_CHANGED);
     assert_untouched(&f);
-    CHECK_INT_EQ(f.console.mount_calls, 0);
+    CHECK_INT_EQ(f.console.mount_calls, 1); /* read-only, for the unsent-progress check */
+    CHECK_INT_EQ(f.console.rw_mount_calls, 0);
     CHECK_INT_EQ(sd_backup_count(&f), 0);
     CHECK_INT_EQ(f.world.net_calls, 1);
     fixture_close(&f);
@@ -508,6 +529,153 @@ static void home_is_locked_only_around_the_write(void)
     fixture_close(&f);
 }
 
+/* --- slice 3.1: progress on the Switch that never reached the PC ------------------------------------------------- */
+
+#define OTHER_FINGERPRINT "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+#define WARN_UNSENT "Switch save has progress not sent to PC!\n"
+#define WARN_UNKNOWN "Could not check the Switch save for progress not sent to PC.\n"
+#define QUESTION_START "PC save from 2026-11-03 14:25 ("
+
+static bool prompt_starts_with(const pull_fixture_t *f, const char *start)
+{
+    return strncmp(f->world.confirm_prompts[0], start, strlen(start)) == 0;
+}
+
+static void a_switch_save_equal_to_the_last_sync_gets_the_plain_question(void)
+{
+    pull_fixture_t f;
+    fixture_open(&f);
+
+    run_pull(&f);
+
+    CHECK_INT_EQ(f.result.unsent, UNSENT_NONE);
+    CHECK(prompt_starts_with(&f, QUESTION_START));
+    CHECK(strstr(f.world.confirm_prompts[0], "not sent") == NULL);
+    fixture_close(&f);
+}
+
+static void a_switch_save_changed_since_the_last_sync_is_warned_about_before_the_question(void)
+{
+    pull_fixture_t f;
+    fixture_open(&f);
+    use_last_sync(&f, OTHER_FINGERPRINT);
+
+    run_pull(&f);
+
+    CHECK_INT_EQ(f.result.unsent, UNSENT_FOUND);
+    CHECK(prompt_starts_with(&f, WARN_UNSENT QUESTION_START));
+    CHECK_INT_EQ(f.result.kind, PULL_OK); /* A still restores: the warning only informs */
+    fixture_close(&f);
+}
+
+static void the_warning_holds_whichever_way_the_last_sync_went(void)
+{
+    /* The last sync was this very save sent to the PC, then TotK on the Switch saved again. */
+    pull_fixture_t f;
+    fixture_open(&f);
+    CHECK(test_fs_write_file(f.save, "slot_00/progress.sav", "switch progress, played after the sync", 38));
+
+    run_pull(&f);
+
+    CHECK_INT_EQ(f.result.unsent, UNSENT_FOUND);
+    CHECK(prompt_starts_with(&f, WARN_UNSENT));
+    fixture_close(&f);
+}
+
+static void a_save_never_synced_is_warned_about(void)
+{
+    pull_fixture_t f;
+    fixture_open(&f);
+    use_last_sync(&f, "none");
+
+    run_pull(&f);
+
+    CHECK_INT_EQ(f.result.unsent, UNSENT_FOUND);
+    CHECK(prompt_starts_with(&f, WARN_UNSENT QUESTION_START));
+    fixture_close(&f);
+}
+
+static void a_switch_save_equal_to_the_pc_save_needs_no_warning_even_when_never_synced(void)
+{
+    pull_fixture_t f;
+    fixture_open(&f);
+    char same_as_pc[256];
+    CHECK(test_fs_make_contract_save(same_as_pc, sizeof same_as_pc));
+    snprintf(f.console.mount_root, sizeof f.console.mount_root, "%s", same_as_pc);
+    use_last_sync(&f, "none");
+    f.world.confirm_answer = false;
+
+    run_pull(&f);
+
+    CHECK_INT_EQ(f.result.unsent, UNSENT_NONE);
+    CHECK(prompt_starts_with(&f, QUESTION_START));
+    fixture_close(&f);
+}
+
+static void a_launcher_that_does_not_name_the_last_sync_gets_the_could_not_check_line(void)
+{
+    const char *values[] = { NULL, "sha256:not-a-fingerprint", "" };
+    for (size_t i = 0; i < sizeof values / sizeof values[0]; i++) {
+        pull_fixture_t f;
+        fixture_open(&f);
+        use_last_sync(&f, values[i]);
+        f.world.confirm_answer = false;
+
+        run_pull(&f);
+
+        CHECK_INT_EQ(f.result.unsent, UNSENT_UNKNOWN);
+        CHECK(prompt_starts_with(&f, WARN_UNKNOWN QUESTION_START));
+        fixture_close(&f);
+    }
+}
+
+static void a_switch_save_that_cannot_be_read_gets_the_could_not_check_line_and_b_still_changes_nothing(void)
+{
+    pull_fixture_t f;
+    fixture_open(&f);
+    f.console.does_mount_succeed = false;
+    f.console.mount_error = 0x1234;
+    f.world.confirm_answer = false;
+
+    run_pull(&f);
+
+    CHECK_INT_EQ(f.result.unsent, UNSENT_UNKNOWN);
+    CHECK(prompt_starts_with(&f, WARN_UNKNOWN QUESTION_START));
+    CHECK_INT_EQ(f.result.kind, PULL_CANCELLED);
+    assert_untouched(&f);
+    fixture_close(&f);
+}
+
+static void the_unsent_check_only_reads_and_unmounts_before_the_question(void)
+{
+    pull_fixture_t f;
+    fixture_open(&f);
+    use_last_sync(&f, OTHER_FINGERPRINT);
+    f.world.confirm_answer = false;
+
+    run_pull(&f);
+
+    CHECK_INT_EQ(f.console.mount_calls, 1);
+    CHECK_INT_EQ(f.console.unmount_calls, 1);
+    CHECK_INT_EQ(f.console.rw_mount_calls, 0);
+    CHECK_INT_EQ(f.files.mutations, 0);
+    assert_untouched(&f);
+    fixture_close(&f);
+}
+
+static void nothing_is_checked_when_the_pull_stops_before_the_question(void)
+{
+    pull_fixture_t f;
+    fixture_open(&f);
+    use_pc_zip(&f, "invalid-no-option.zip");
+
+    run_pull(&f);
+
+    CHECK_INT_EQ(f.result.unsent, UNSENT_NOT_CHECKED);
+    CHECK_INT_EQ(f.console.mount_calls, 0);
+    fixture_close(&f);
+}
+
 void run_get_from_pc_tests(void)
 {
     RUN_TEST(get_from_pc_restores_the_pc_save_exactly_and_confirms_the_sync);
@@ -529,4 +697,13 @@ void run_get_from_pc_tests(void)
     RUN_TEST(when_the_restore_fails_too_the_backup_path_and_jksv_are_named);
     RUN_TEST(an_ack_that_does_not_arrive_is_a_warning_after_a_good_restore);
     RUN_TEST(home_is_locked_only_around_the_write);
+    RUN_TEST(a_switch_save_equal_to_the_last_sync_gets_the_plain_question);
+    RUN_TEST(a_switch_save_changed_since_the_last_sync_is_warned_about_before_the_question);
+    RUN_TEST(the_warning_holds_whichever_way_the_last_sync_went);
+    RUN_TEST(a_save_never_synced_is_warned_about);
+    RUN_TEST(a_switch_save_equal_to_the_pc_save_needs_no_warning_even_when_never_synced);
+    RUN_TEST(a_launcher_that_does_not_name_the_last_sync_gets_the_could_not_check_line);
+    RUN_TEST(a_switch_save_that_cannot_be_read_gets_the_could_not_check_line_and_b_still_changes_nothing);
+    RUN_TEST(the_unsent_check_only_reads_and_unmounts_before_the_question);
+    RUN_TEST(nothing_is_checked_when_the_pull_stops_before_the_question);
 }

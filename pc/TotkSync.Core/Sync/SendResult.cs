@@ -6,7 +6,10 @@ public abstract record SendResult
     {
     }
 
-    public sealed record Sent(byte[] Zip, string Fingerprint, DateTimeOffset Modified) : SendResult;
+    /// <param name="LastSync">The last sync's fingerprint, or null when the save was never synced.</param>
+    /// <param name="IsLastSyncKnown">False when the sync state could not be read; LastSync is null then.</param>
+    public sealed record Sent(byte[] Zip, string Fingerprint, DateTimeOffset Modified, string? LastSync, bool IsLastSyncKnown)
+        : SendResult;
 
     public sealed record NoSave : SendResult;
 
